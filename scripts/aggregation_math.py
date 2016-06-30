@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function
 
+import numpy as np
 from copy import deepcopy
 
 OPS = ['*', '/', '+', '-']
@@ -45,6 +46,8 @@ def interpretate_rec(s):
 
 def get_calc_steps(s):
     s = interpretate_rec(s)
+    if len(s) == 1:
+        return None
     steps = []
     counter = 0
     while True:
@@ -67,49 +70,66 @@ def get_calc_steps(s):
             break
     return steps
 
+def get_participants(cmd):
+    splitted = interpretate_rec(cmd)
+    for o in OPS:
+        splitted = [s for s in splitted if s != o]
+    return splitted
 
-def aggregate(arr_dict, cmd, key, keep=False):
-    used_components = set()
-    local_dict = deepcopy(arr_dict)
-    if any([cmd.startswith(o) for o in OPS]):
-        raise ValueError('Aggregate cmd can not start with an operator')
-    elif any([cmd.endswith(o) for o in OPS]):
-        raise ValueError('Aggregate cmd can not end with an operator')
-    else:
-        steps = get_calc_steps(cmd)
-    for result_name, calculation in steps:
-        a = local_dict[calculation[0]]
-        used_components.add(calculation[0])
-        o = calculation[1]
-        b = local_dict[calculation[2]]
-        used_components.add(calculation[2])
-        if o == '+':
-            result = a + b
-        elif o == '-':
-            result = a - b
-        elif o == '*':
-            result = a * b
-        elif o == '/':
-            result = a / b
+
+def aggregate(arr, cmds, list_data, list_plot):
+    local_dict = {}
+    for i, comp in enumerate(list_data):
+        local_dict[comp] = arr[:, i, :]
+    for i, cmd in enumerate(cmds):
+        used_components = set()
+        if any([cmd.startswith(o) for o in OPS]):
+            raise ValueError('Aggregate cmd can not start with an operator')
+        elif any([cmd.endswith(o) for o in OPS]):
+            raise ValueError('Aggregate cmd can not end with an operator')
         else:
-            raise ValueError('Invalid operator \'%s\'' % o)
-        local_dict[result_name] = result
-        used_components.add(result_name)
-    local_dict[key] = result
-    for k in arr_dict.keys():
-        used_components.discard(k)
-    for k in used_components:
-        del local_dict[k]
-    return local_dict, used_components
+            steps = get_calc_steps(cmd)
+        if steps is None:
+            continue
+        for result_name, calculation in steps:
+            a = local_dict[calculation[0]]
+            o = calculation[1]
+            b = local_dict[calculation[2]]
+            if o == '+':
+                result = a + b
+            elif o == '-':
+                result = a - b
+            elif o == '*':
+                result = a * b
+            elif o == '/':
+                result = a / b
+            else:
+                raise ValueError('Invalid operator \'%s\'' % o)
+            local_dict[result_name] = result
+            used_components.add(result_name)
+        local_dict[list_plot[i]] = result
+        for k in used_components:
+            del local_dict[k]
+    plotting_hist = np.empty((arr.shape[0], len(list_plot), arr.shape[2]))
+    for i, comp in enumerate(list_plot):
+        plotting_hist[:, i, :] = local_dict[comp]
+    return plotting_hist
 
 if __name__ == '__main__':
     import numpy as np
-    a = np.arange(10)
-    b = np.arange(10)[::-1]
-    cmd = 'a+b'
-    d = aggregate({'a': a,
-                   'b': b,
-                   'd': a},
-                  cmd,
-                  'c')
+    a = np.arange(100).reshape((10, 10))
+    b = np.arange(100).reshape((10, 10))
+    #b = b.T
+    arr = np.zeros((10, 2, 10))
+    arr[:, 0, :] = a
+    arr[:, 1, :] = b
+    cmds = ['a', 'a+b', 'a-b']
+
+    list_data = ['a', 'b']
+    list_plot = ['a', 'c', 'd']
+
+    d = aggregate(arr,
+                  cmds,
+                  list_data,
+                  list_plot)
     print(d)

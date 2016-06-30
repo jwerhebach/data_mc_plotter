@@ -9,9 +9,9 @@ import shutil
 from ConfigParser import SafeConfigParser
 from optparse import OptionParser
 
+from scripts.component_handler import Component
+import scripts.config_parser_helper as ch
 from scripts.comparison_plotter import ComparisonPlotter
-from scripts.file_grabber import FileGrabber
-from scripts.config_parser_helper import convert_list
 
 
 if __name__ == '__main__':
@@ -47,15 +47,6 @@ if __name__ == '__main__':
     config = SafeConfigParser()
     l = config.read(config_file)
 
-    assert config.has_section('General'), \
-        "Section 'General' with options 'Level' and Components is mandatory"
-    assert config.has_option('General', 'Level'), \
-        "Option 'Level' in Section General is mandatory"
-    assert config.has_option('General', 'Components'), \
-        "Option 'Components' in Section General is mandatory"
-
-    level = config.getint('General', 'Level')
-
     outpath = None
     if config.has_option('General', 'Outpath'):
         outpath_opt = config.get('General', 'Outpath')
@@ -76,88 +67,48 @@ if __name__ == '__main__':
             os.makedirs(outpath)
     shutil.copy(config_file, outpath)
 
-    file_grabber = FileGrabber(system_config=syst_conf,
-                               level=level)
-    components = convert_list(config.get('General', 'Components'))
-    for c in components:
-        assert config.has_section(c), \
-            "For each component a section is needed"
-        has_needed_opts = config.has_option(c, 'Name') and \
-            config.has_option(c, 'Type')
-        component_type = config.get(c, 'Type')
-        if component_type == 'MC':
-            has_needed_opts = has_needed_opts and \
-                config.has_option(c, 'Weight')
-            assert has_needed_opts, \
-                '\'MC\' component needs \'Name\', and \'Weight\''
-            dataset_name = config.get(c, 'Name')
-            if config.has_option(c, 'MaxFiles'):
-                max_files = config.getint(c, 'MaxFiles')
-            else:
-                max_files = -1
-            file_grabber.add_component(
-                {'dataset': config.get(c, 'Name'),
-                 'weight': config.get(c, 'Weight'),
-                 'type': config.get(c, 'Type'),
-                 'max_files': max_files})
-        elif component_type == 'Data':
-            has_needed_opts = has_needed_opts and \
-                config.has_option(c, 'Burnsample')
-            assert has_needed_opts, \
-                '\'Data\' component needs \'Name\', and \'Burnsample\''
-            if config.has_option(c, 'MaxFiles'):
-                max_files = config.getint(c, 'MaxFiles')
-            else:
-                max_files = -1
-            file_grabber.add_component(
-                {'dataset': config.get(c, 'Name'),
-                 'burnsample': config.getboolean(c, 'Burnsample'),
-                 'type': config.get(c, 'Type'),
-                 'max_files': max_files})
-        else:
-            print(component_type)
-            raise ValueError('Component Type can be either \'MC\' or \'Data\'')
 
-    components = file_grabber.get_component_dict()
+    components = []
+    components_opts = ch.convert_list(config.get('General', 'Components'))
+    for c in components_opts:
+        assert config.has_section(c), \
+            'For each component a section is neede\'%s\' missing!' % c
+        component_dict = dict(config.items(c))
+        curr_component = Component(c, component_dict)
+        if curr_component not in components:
+            components.append(curr_component)
+        if curr_component.aggregation is not None:
+            for i, c_a in enumerate(curr_component.aggregation.participant):
+                if c_a not in components:
+                    component_dict = dict(config.items(c_a))
+                    components.append(Component(c_a, component_dict))
+                index = components.index(c_a)
+                if not curr_component.aggregation.keep_components:
+                    components[index].show = False
+                curr_component.aggregation.participant[i] = components[index]
 
     if config.has_option('General', 'IDKeys'):
         id_keys_opts = config.get('General', 'IDKeys')
-        id_keys = convert_list(id_keys_opts)
+        id_keys = ch.convert_list(id_keys_opts)
     else:
         id_keys = []
-
-    if config.has_option('General', 'SumMC'):
-        sum_mc = config.getboolean('General', 'SumMC')
-    else:
-        sum_mc = False
-
-    if config.has_section('Aggregations'):
-        aggregations = dict(config.items('Aggregations'))
-    else:
-        aggregations = None
-
-    comp_plotter = ComparisonPlotter(system_config=syst_conf,
-                                     components=components,
-                                     id_keys=id_keys,
-                                     sum_mc=sum_mc,
-                                     aggregations=aggregations)
 
     obs = '*'
     if config.has_option('General', 'Observables'):
         obs_opts = config.get('General', 'Observables')
         if obs_opts not in ['all', '*']:
-            obs = convert_list(obs_opts)
+            obs = ch.convert_list(obs_opts)
 
     if config.has_option('General', 'Uncertainties'):
-        uncer_opts = config.get('General', 'Uncertainties')
-        if uncer_opts in ['mc', 'MC', 'Mc']:
-            uncertainties = 'Sum'
-        elif uncer_opts is None or uncer_opts in ['None', 'none']:
-            uncertainties = ''
-        else:
-            uncertainties = uncer_opts
-    else:
-        uncertainties = 'Sum'
+        uncertainties_opts = config.get('General', 'Uncertainties')
+        uncertainties = ch.convert_list(uncertainties_opts)
+        for c in uncertainties:
+            components[components.index(c)].calc_uncertainties =True
+
+    comp_plotter = ComparisonPlotter(components,
+                                     id_keys,
+                                     match=False,
+                                     n_bins=50)
 
     if opts.possible or obs == '*':
         blacklist = {'obs': [],
@@ -170,19 +121,19 @@ if __name__ == '__main__':
                                                 'Observables')
                 if blacklist_obs_opts != ['None', 'none']:
                     blacklist['obs'].extend(
-                        convert_list(blacklist_obs_opts))
+                        ch.convert_list(blacklist_obs_opts))
             if config.has_option('Blacklist', 'Tables'):
                 blacklist_tabs_opts = config.get('Blacklist',
                                                  'Tables')
                 if blacklist_tabs_opts != ['None', 'none']:
                     blacklist['tabs'].extend(
-                        convert_list(blacklist_tabs_opts))
+                        ch.convert_list(blacklist_tabs_opts))
             if config.has_option('Blacklist', 'Columns'):
                 blacklist_tabs_opts = config.get('Blacklist',
                                                  'Columns')
                 if blacklist_tabs_opts != ['None', 'none']:
                     blacklist['cols'].extend(
-                        convert_list(blacklist_tabs_opts))
+                        ch.convert_list(blacklist_tabs_opts))
         obs = comp_plotter.get_possiblites(outpath=outpath,
                                            blacklist=blacklist)
         if opts.possible:

@@ -8,11 +8,18 @@ def convert_list(obs_str):
         obs_str = obs_str.replace(s, '')
     return obs_str.split(',')
 
-
-def check_for_complete_config(config):
-    assert config.has_section('General'), \
-        "Section 'General' with options 'Level' and Components is mandatory"
-    assert config.has_option('General', 'Level'), \
-        "Option 'Level' in Section General is mandatory"
-    assert config.has_option('General', 'Components'), \
-        "Option 'Components' in Section General is mandatory"
+def split_obs_str(obs):
+    if not isinstance(obs, list):
+        obs = [obs]
+    obs_dict = {}
+    for o in obs:
+        splitted = o.split('.')
+        key = splitted[0]
+        current_content = obs_dict.get(key, [[], []])
+        current_content[0].append(splitted[1])
+        if len(splitted) == 3:
+            current_content[1].append(splitted[2])
+        else:
+            current_content[1].append(None)
+        obs_dict[key] = current_content
+    return obs_dict
