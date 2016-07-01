@@ -80,7 +80,7 @@ def get_participants(cmd):
 def aggregate(arr, cmds, list_data, list_plot):
     local_dict = {}
     for i, comp in enumerate(list_data):
-        local_dict[comp] = arr[:, i, :]
+        local_dict[comp] = arr[i, :, :]
     for i, cmd in enumerate(cmds):
         used_components = set()
         if any([cmd.startswith(o) for o in OPS]):
@@ -110,9 +110,9 @@ def aggregate(arr, cmds, list_data, list_plot):
         local_dict[list_plot[i]] = result
         for k in used_components:
             del local_dict[k]
-    plotting_hist = np.empty((arr.shape[0], len(list_plot), arr.shape[2]))
+    plotting_hist = np.empty((len(list_plot), arr.shape[1], arr.shape[2]))
     for i, comp in enumerate(list_plot):
-        plotting_hist[:, i, :] = local_dict[comp]
+        plotting_hist[i, :, :] = local_dict[comp]
     return plotting_hist
 
 if __name__ == '__main__':

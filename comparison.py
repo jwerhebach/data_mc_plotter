@@ -104,7 +104,11 @@ if __name__ == '__main__':
         uncertainties = ch.convert_list(uncertainties_opts)
         for c in uncertainties:
             components[components.index(c)].calc_uncertainties =True
-
+        alphas_ops = config.get('General', 'Alphas')
+        alphas = [float(a) for a in ch.convert_list(alphas_ops)]
+    else:
+        alphas = []
+    print(alphas)
     comp_plotter = ComparisonPlotter(components,
                                      id_keys,
                                      match=False,
@@ -140,4 +144,4 @@ if __name__ == '__main__':
             sys.exit()
     comp_plotter.plot(observables=obs,
                       outpath=outpath,
-                      uncertainties=uncertainties)
+                      alphas=alphas)

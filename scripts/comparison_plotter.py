@@ -48,66 +48,74 @@ class ComparisonPlotter:
             else:
                 self.cmds.append(c.aggregation.cmd)
 
-    def plot(self, observables, outpath, uncertainties=''):
+    def plot(self, observables, outpath, alphas=[]):
         observables = ch.split_obs_str(observables)
         print('Fetching Observable infos')
         n_obs = np.sum([len(observables[k][0]) for k in observables.keys()])
         list_data = [str(c) for c in self.data_components]
         list_plot = [str(c) for c in self.plotting_components]
+        hists = np.empty((len(self.data_components), n_obs, self.n_bins))
+        binnings = np.empty((n_obs, self.n_bins+1))
+        trans_obs = []
+        obs_keys = []
+        cols_mask = []
+        finished_cols = 0
         with tqdm(total=n_obs, unit='Observables') as pbar:
             for table_key, [cols, trans] in observables.iteritems():
-                hists = np.empty((len(cols),
-                                  len(self.data_components),
-                                  self.n_bins))
-                binnings = np.empty((len(cols), self.n_bins+1))
-                trans_obs = []
-                cols_mask = []
                 for i, comp in enumerate(self.data_components):
                     all_values = comp.get_values(table_key, cols)
                     for j, [c, t] in enumerate(zip(cols, trans)):
+                        current_col = finished_cols + j
                         obs_key = '%s.%s' % (table_key, c)
                         if i == 0:
+                                obs_keys.append(obs_key)
                                 cols_mask.append(True)
-                        if cols_mask[j]:
+                                transformed_obs_key = dh.transform_obs(obs_key, t)
+                                trans_obs.append(transformed_obs_key)
+                        if cols_mask[current_col]:
                             vals, weights = dh.filter_nans(all_values[:, j],
                                                            comp.weight)
                             vals = dh.transform_values(vals, t)
-                            transformed_obs_key = dh.transform_obs(obs_key, t)
-                            trans_obs.append(transformed_obs_key)
                             if i == 0:
                                 if len(vals) == 0:
-                                    cols_mask[j] = False
+                                    cols_mask[current_col] = False
                                 else:
                                     binning = self.min_max_binning(vals)
                                     if binning is None:
-                                        cols_mask[j] = False
+                                        cols_mask[current_col] = False
                                     else:
-                                        binnings[j] = binning
-                            if cols_mask[j]:
+                                        binnings[current_col] = binning
+                            if cols_mask[current_col]:
                                 hist = np.histogram(vals,
                                                     bins=binnings[j],
                                                     weights=weights)[0]
-                                hists[j, i, :] = hist * self.livetime
-                hists = hists[np.where(cols_mask)[0], :, :]
-                plotting_hists = aggregate(hists,
-                                           self.cmds,
-                                           list_data,
-                                           list_plot)
-                plotting_cols = [c for i, c in enumerate(cols) if cols_mask[i]]
-                binnings = binnings[np.where(cols_mask)[0]]
-                for i, col in enumerate(plotting_cols):
-                    obs_key = '%s.%s' % (table_key, col)
-                    f, ax = plt.subplots()
-                    ax.set_yscale('log',)
-                    for j, comp in enumerate(self.plotting_components):
-                        plot_funcs.plot_hist(ax,
-                                             label=comp.label,
-                                             hist=plotting_hists[i, j, :],
-                                             binning=binnings[i],
-                                             color=comp.color,
-                                             style='MC')
-                    plot_funcs.save_fig(f, obs_key)
+                                hists[i, current_col, :] = hist * self.livetime
                 pbar.update(len(cols))
+        hists = hists[:, np.where(cols_mask)[0], :]
+        plotting_hists = aggregate(hists,
+                                   self.cmds,
+                                   list_data,
+                                   list_plot)
+        plotting_keys = [c for i, c in enumerate(obs_keys)
+                         if cols_mask[i]]
+        transformed_keys = [c for i, c in enumerate(trans_obs)
+                            if cols_mask[i]]
+        binnings = binnings[np.where(cols_mask)[0]]
+        for i, comp in enumerate(self.plotting_components):
+            comp.hists = plotting_hists[i, :, :]
+            if comp.calc_uncertainties:
+                if len(alphas) > 0:
+                    alphas = sorted(alphas)
+                    comp.uncertainties = calc_limits(comp.hists,
+                                                     alphas)
+        plot_funcs.plot(outpath,
+                        self.plotting_components,
+                        binnings,
+                        plotting_keys,
+                        plotting_keys,
+                        transformed_keys,
+                        alphas)
+
 
     def get_possiblites(self,
                         outpath,
@@ -148,7 +156,3 @@ class ComparisonPlotter:
             return None
         else:
             return np.linspace(min_val, max_val, self.n_bins + 1)
-
-
-
-

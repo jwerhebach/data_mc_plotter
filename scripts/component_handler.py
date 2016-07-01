@@ -57,9 +57,14 @@ class Component:
             self.weight = None
         if self.color is None:
             self.color = get_color()
-        self.calc_uncertainties = False
+
         self.ids = self.ID()
+
         self.show = True
+        self.calc_uncertainties = False
+
+        self.hists = None
+        self.uncertainties = None
 
     def init_component(self, id_dict):
         if self.aggregation is None:
