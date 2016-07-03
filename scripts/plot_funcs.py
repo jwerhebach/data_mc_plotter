@@ -31,12 +31,12 @@ def get_color():
         get_color.pointer = 0
     return color_cycle[get_color.pointer]
 
-get_color.pointer = 0
+get_color.pointer = -1
 
-uncertainties_cycle = ['viridis',
-                       'plasma',
-                       'magma',
-                       'inferno']
+uncertainties_cycle = ['viridis_r',
+                       'plasma_r',
+                       'magma_r',
+                       'inferno_r']
 
 
 def get_cmap():
@@ -45,11 +45,12 @@ def get_cmap():
         get_cmap.pointer = 0
     return uncertainties_cycle[get_cmap.pointer]
 
-get_cmap.pointer = 0
+get_cmap.pointer = -1
 
 lw = 2.
 ms = '5'
 edgecolor_data = 'k'
+ZORDER = 2
 
 
 def plot(output,
@@ -101,16 +102,13 @@ def plot(output,
                                                   c.color,
                                                   c.cmap,
                                                   alphas)
-                    _, _ = plot_mc_style(fig,
-                                         ax,
-                                         hist,
-                                         binning,
-                                         c.label,
-                                         c.color)
                     if i == 0:
                         legend_objects.extend(obj)
                         legend_labels.extend(lab)
-        ax.legend(legend_objects, legend_labels, handler_map=le.handler_mapper)
+        ax.legend(legend_objects, legend_labels, handler_map=le.handler_mapper,
+                  loc='best')
+        ax.set_xlabel(transformed_keys[i])
+        ax.set_ylabel('# Entries [Hz]')
         save_fig(fig, os.path.join(output, obs_keys[i]), tight=True)
 
 
@@ -120,17 +118,17 @@ def plot_data_style(fig, ax, hist, binning, label, color):
 
     markeredgecolor = 'k'
     markerfacecolor = color
-
     ax.plot(bin_center[zero_mask],
             hist[zero_mask],
             ls='', ms=ms,
-            mew=lw - 0.5,
+            mew=1.,
             marker='o',
             markeredgecolor=markeredgecolor,
-            markerfacecolor=markerfacecolor)
+            markerfacecolor=markerfacecolor,
+            zorder=ZORDER)
     plot_zero_marker(fig, ax,
-                     bin_center[~zero_mask],
-                     [binning[0], binning[-1]],
+                     binning,
+                     zero_mask,
                      markerfacecolor=markerfacecolor,
                      markeredgecolor=markeredgecolor)
     return le.DataObject(markerfacecolor,
@@ -139,7 +137,7 @@ def plot_data_style(fig, ax, hist, binning, label, color):
                          markeredgecolor), label
 
 
-def plot_zero_marker(fig, ax, x, x_lims, markeredgecolor='k',
+def plot_zero_marker(fig, ax, binning, zero_mask, markeredgecolor='k',
                      markerfacecolor='none'):
     patches = []
     radius = 0.008
@@ -147,30 +145,47 @@ def plot_zero_marker(fig, ax, x, x_lims, markeredgecolor='k',
     x_0 = bbox.x0
     width = bbox.x1 - bbox.x0
     y0 = bbox.y0
-    for x_i in x:
-        x_i = (x_i / np.diff(x_lims) * width) + x_0
-        patches.append(mpatches.RegularPolygon([x_i, y0 + radius], 3,
-                                               radius=radius,
-                                               orientation=np.pi,
-                                               facecolor=markerfacecolor,
-                                               edgecolor=markeredgecolor,
-                                               transform=fig.transFigure,
-                                               figure=fig))
+    bin_center = (binning[1:] + binning[:-1]) / 2
+    binning_width = binning[-1] - binning[0]
+    bin_0 = binning[0]
+    for bin_i, mask_i in zip(bin_center, zero_mask):
+        if not mask_i:
+            x_i = ((bin_i - bin_0) / binning_width * width) + x_0
+            patches.append(mpatches.RegularPolygon([x_i, y0 + radius], 3,
+                                                   radius=radius,
+                                                   orientation=np.pi,
+                                                   facecolor=markerfacecolor,
+                                                   edgecolor=markeredgecolor,
+                                                   transform=fig.transFigure,
+                                                   figure=fig,
+                                                   linewidth=1.,
+                                                   zorder=ZORDER))
     fig.patches.extend(patches)
 
 
-def plot_mc_style(fig, ax, hist, binning, label, color):
+def plot_mc_style(fig, ax, hist, binning, label, color, linewidth=None):
+        if linewidth is None:
+            linewidth = lw
         obj, = ax.plot(binning,
                        np.append(hist[0], hist),
                        drawstyle='steps-pre',
-                       lw=lw,
+                       lw=linewidth,
                        c=color,
-                       label=label)
+                       label=label,
+                       zorder=ZORDER)
         return obj, label
 
 
 def plot_uncertainties(fig, ax, hist, uncert, binning,
                        label, color, cmap, alphas):
+    _, _ = plot_mc_style(fig,
+                         ax,
+                         hist,
+                         binning,
+                         label,
+                         color,
+                         linewidth=lw - 1.)
+    n_alphas = len(alphas)
     cmap = plt.get_cmap(cmap)
     colors = cmap(np.linspace(0.1, 0.9, len(alphas)))
     legend_entries = []
@@ -178,14 +193,16 @@ def plot_uncertainties(fig, ax, hist, uncert, binning,
     legend_entries.append(le.UncertObject(colors, color))
     legend_labels.append(label)
     for i, (c, a) in enumerate(zip(colors[::-1], alphas[::-1])):
-        lower_limit = uncert[:, i, 0]
-        upper_limit = uncert[:, i, 1]
+        j = n_alphas - i - 1
+        lower_limit = uncert[:, j, 0] * hist
+        upper_limit = uncert[:, j, 1] * hist
         ax.fill_between(
             binning,
             np.append(lower_limit[0], lower_limit),
             np.append(upper_limit[0], upper_limit),
             step='pre',
-            color=c)
+            color=c,
+            zorder=ZORDER)
     for i, (c, a) in enumerate(zip(colors, alphas)):
         legend_entries.append(le.UncertObject_single(c))
         legend_labels.append('      %.1f%% Uncert.' % (a * 100.))

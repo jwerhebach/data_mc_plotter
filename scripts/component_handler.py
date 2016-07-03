@@ -72,8 +72,6 @@ class Component:
         if self.calc_uncertainties:
             self.cmap = get_cmap()
 
-
-
     def init_component(self, id_dict):
         if self.aggregation is None:
             ids, id_func, id_func_r = self.__get_ids__(id_dict)
@@ -219,6 +217,3 @@ class Component:
         ids = None
         id_func = None
         id_func_rev = None
-
-
-

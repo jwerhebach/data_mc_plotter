@@ -108,7 +108,6 @@ if __name__ == '__main__':
         alphas = [float(a) for a in ch.convert_list(alphas_ops)]
     else:
         alphas = []
-    print(alphas)
     comp_plotter = ComparisonPlotter(components,
                                      id_keys,
                                      match=False,

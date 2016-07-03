@@ -35,7 +35,7 @@ def calc_limits(mu, alphas=0.68268949):
         upper = [slice(None) for _ in range(len(mu.shape))]
         upper.append(1)
         lim[lower], lim[upper] = sc_dist.poisson.interval(alphas, mu)
-        return lim
+        return lim / mu
     else:
         lim_shape = list(mu.shape) + [len(alphas), 2]
         lim = np.zeros(lim_shape)
@@ -44,7 +44,9 @@ def calc_limits(mu, alphas=0.68268949):
             lower.extend([i, 0])
             upper = [slice(None) for _ in range(len(mu.shape))]
             upper.extend([i, 1])
-            lim[lower], lim[upper] = sc_dist.poisson.interval(a, mu)
+            lim_lower, lim_upper = sc_dist.poisson.interval(a, mu)
+            lim[lower] = lim_lower / mu
+            lim[upper] = lim_upper / mu
         return lim
 
 

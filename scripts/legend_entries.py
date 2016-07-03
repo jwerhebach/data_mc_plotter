@@ -8,11 +8,12 @@ import matplotlib.patches as mpatches
 
 
 class DataObject(object):
-    def __init__(self, fc_t='w', ec_t='k', fc_c='w', ec_c='k'):
+    def __init__(self, fc_t='w', ec_t='k', fc_c='w', ec_c='k', lw=1.):
         self.fc_t = fc_t
         self.ec_t = ec_t
         self.fc_c = fc_c
         self.ec_c = ec_c
+        self.lw = lw
 
 
 class data_handler(object):
@@ -32,11 +33,13 @@ class data_handler(object):
             orientation=np.pi,
             facecolor=orig_handle.fc_t,
             edgecolor=orig_handle.ec_t,
-            transform=handlebox.get_transform())
+            transform=handlebox.get_transform(),
+            linewidth=orig_handle.lw)
         patch_circ = mpatches.Circle([xc_0, yc_0], radius,
                                      facecolor=orig_handle.fc_c,
                                      edgecolor=orig_handle.ec_c,
-                                     transform=handlebox.get_transform())
+                                     transform=handlebox.get_transform(),
+                                     linewidth=orig_handle.lw)
         handlebox.add_artist(patch_tri)
         handlebox.add_artist(patch_circ)
         return patch_circ
@@ -71,7 +74,7 @@ class uncert_handler(object):
                           [y_mid, y_mid],
                           color=orig_handle.linecolor,
                           linestyle='-',
-                          linewidth=2)
+                          linewidth=1)
         handlebox.add_artist(line)
         return line
 

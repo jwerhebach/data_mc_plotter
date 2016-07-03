@@ -88,7 +88,11 @@ class ComparisonPlotter:
                                 hist = np.histogram(vals,
                                                     bins=binnings[j],
                                                     weights=weights)[0]
-                                hists[i, current_col, :] = hist * self.livetime
+                                if comp.ctype == 'MC':
+                                    hists[i, current_col, :] = hist * self.livetime
+                                else:
+                                    hists[i, current_col, :] = hist
+
                 pbar.update(len(cols))
         hists = hists[:, np.where(cols_mask)[0], :]
         plotting_hists = aggregate(hists,
@@ -107,6 +111,8 @@ class ComparisonPlotter:
                     alphas = sorted(alphas)
                     comp.uncertainties = calc_limits(comp.hists,
                                                      alphas)
+        plotting_hists /= self.livetime
+
         plot_funcs.plot(outpath,
                         self.plotting_components,
                         binnings,
