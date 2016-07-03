@@ -103,7 +103,7 @@ if __name__ == '__main__':
         uncertainties_opts = config.get('General', 'Uncertainties')
         uncertainties = ch.convert_list(uncertainties_opts)
         for c in uncertainties:
-            components[components.index(c)].calc_uncertainties =True
+            components[components.index(c)].calc_uncert(True)
         alphas_ops = config.get('General', 'Alphas')
         alphas = [float(a) for a in ch.convert_list(alphas_ops)]
     else:

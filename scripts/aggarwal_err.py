@@ -25,6 +25,7 @@ def __shorten_single_limits_single_mu__(lower, upper, mu, alpha):
             break
     return lower, upper
 
+
 def calc_limits(mu, alphas=0.68268949):
     if isinstance(alphas, float):
         lim_shape = list(mu.shape) + [2]
@@ -47,18 +48,19 @@ def calc_limits(mu, alphas=0.68268949):
         return lim
 
 
-
 def calc_limits_different_mode(mu, alpha=0.68268949, interval_type='central'):
     mu = np.asarray(mu)
     alpha = np.asarray(alpha)
     lower, upper = sc_dist.poisson.interval(alpha, mu)
     if interval_type == 'shortest':
         for i, mu_i in enumerate(mu):
-            lower[i], upper[i] = __reduce__(lower[i], upper[i], mu_i, alpha)
+            lower[i], upper[i] = __shorten_single_limits_single_mu__(
+                lower[i], upper[i], mu_i, alpha)
     return lower, upper
 
+
 if __name__ == '__main__':
-    mu = np.arange(27).reshape((3,3,3))
+    mu = np.arange(27).reshape((3, 3, 3))
     alpha = 0.999
     a = calc_limits(mu, alpha)
     print(a.shape)

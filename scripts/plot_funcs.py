@@ -5,59 +5,11 @@ from __future__ import division, print_function
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib.collections import PatchCollection
 
 import os
 
-class DataObject(object):
-    def __init__(self, fc_t='w', ec_t='k', fc_c='w', ec_c='k'):
-        self.fc_t = fc_t
-        self.ec_t = ec_t
-        self.fc_c = fc_c
-        self.ec_c = ec_c
+import legend_entries as le
 
-class data_handler(object):
-    def legend_artist(self, legend, orig_handle, fontsize, handlebox):
-        scale = fontsize / 22
-        x0, y0 = handlebox.xdescent, handlebox.ydescent
-        width, height = handlebox.width, handlebox.height
-        radius = height/2 * scale
-        xt_0 = x0 + width - height/2
-        xt_l = xt_0 - radius
-        xt_r = xt_0 + radius
-        yt_0 = y0 + height/2
-        yt_t = yt_0 + radius
-        yt_b = yt_0 - radius
-
-        xc_0 = x0 + height/2 + radius
-        yc_0 = y0 + height/2 * (1 - scale) + radius
-
-        triangle = np.asarray([[xt_l, yt_t],
-                               [xt_0, yt_b],
-                               [xt_r, yt_t]])
-
-        patch_tri = mpatches.Polygon(triangle,
-                                     facecolor=orig_handle.fc_t,
-                                     edgecolor=orig_handle.ec_t,
-                                     transform=handlebox.get_transform())
-        patch_tri = mpatches.RegularPolygon(
-            [xt_0, yc_0],
-            3,
-            radius=radius*1.5,
-            orientation=np.pi,
-            facecolor=orig_handle.fc_t,
-            edgecolor=orig_handle.ec_t,
-            transform=handlebox.get_transform())
-        patch_circ = mpatches.Circle([xc_0, yc_0], radius,
-                                     facecolor=orig_handle.fc_c,
-                                     edgecolor=orig_handle.ec_c,
-                                     transform=handlebox.get_transform())
-        handlebox.add_artist(patch_tri)
-        handlebox.add_artist(patch_circ)
-        return patch_circ
-
-
-handler_mapper = {DataObject: data_handler()}
 
 color_cycle = [(31, 119, 180),
                (255, 127, 14),
@@ -86,6 +38,7 @@ uncertainties_cycle = ['viridis',
                        'magma',
                        'inferno']
 
+
 def get_cmap():
     get_cmap.pointer += 1
     if get_cmap.pointer >= len(uncertainties_cycle):
@@ -106,7 +59,6 @@ def plot(output,
          obs_keys,
          transformed_keys,
          alphas):
-    handler_map_dict = {}
     legend_objects = []
     legend_labels = []
     for i, o in enumerate(obs_keys):
@@ -128,17 +80,39 @@ def plot(output,
                     legend_objects.append(obj)
                     legend_labels.append(lab)
             if c.ctype == 'MC':
-                obj, lab = plot_mc_style(fig,
-                                           ax,
-                                           hist,
-                                           binning,
-                                           c.label,
-                                           c.color)
-                if i == 0:
-                    legend_objects.append(obj)
-                    legend_labels.append(lab)
-        ax.legend(legend_objects, legend_labels, handler_map=handler_mapper)
+                if c.uncertainties is None:
+                    obj, lab = plot_mc_style(fig,
+                                             ax,
+                                             hist,
+                                             binning,
+                                             c.label,
+                                             c.color)
+                    if i == 0:
+                        legend_objects.append(obj)
+                        legend_labels.append(lab)
+                else:
+                    uncert = c.uncertainties[i, :]
+                    obj, lab = plot_uncertainties(fig,
+                                                  ax,
+                                                  hist,
+                                                  uncert,
+                                                  binning,
+                                                  c.label,
+                                                  c.color,
+                                                  c.cmap,
+                                                  alphas)
+                    _, _ = plot_mc_style(fig,
+                                         ax,
+                                         hist,
+                                         binning,
+                                         c.label,
+                                         c.color)
+                    if i == 0:
+                        legend_objects.extend(obj)
+                        legend_labels.extend(lab)
+        ax.legend(legend_objects, legend_labels, handler_map=le.handler_mapper)
         save_fig(fig, os.path.join(output, obs_keys[i]), tight=True)
+
 
 def plot_data_style(fig, ax, hist, binning, label, color):
     zero_mask = hist > 0
@@ -150,7 +124,7 @@ def plot_data_style(fig, ax, hist, binning, label, color):
     ax.plot(bin_center[zero_mask],
             hist[zero_mask],
             ls='', ms=ms,
-            mew=lw-0.5,
+            mew=lw - 0.5,
             marker='o',
             markeredgecolor=markeredgecolor,
             markerfacecolor=markerfacecolor)
@@ -159,10 +133,10 @@ def plot_data_style(fig, ax, hist, binning, label, color):
                      [binning[0], binning[-1]],
                      markerfacecolor=markerfacecolor,
                      markeredgecolor=markeredgecolor)
-    return DataObject(markerfacecolor,
-                      markeredgecolor,
-                      markerfacecolor,
-                      markeredgecolor), label
+    return le.DataObject(markerfacecolor,
+                         markeredgecolor,
+                         markerfacecolor,
+                         markeredgecolor), label
 
 
 def plot_zero_marker(fig, ax, x, x_lims, markeredgecolor='k',
@@ -171,11 +145,11 @@ def plot_zero_marker(fig, ax, x, x_lims, markeredgecolor='k',
     radius = 0.008
     bbox = ax.get_position()
     x_0 = bbox.x0
-    width = bbox.x1-bbox.x0
+    width = bbox.x1 - bbox.x0
     y0 = bbox.y0
     for x_i in x:
-        x_i = (x_i/np.diff(x_lims) * width)+ x_0
-        patches.append(mpatches.RegularPolygon([x_i, y0+radius], 3,
+        x_i = (x_i / np.diff(x_lims) * width) + x_0
+        patches.append(mpatches.RegularPolygon([x_i, y0 + radius], 3,
                                                radius=radius,
                                                orientation=np.pi,
                                                facecolor=markerfacecolor,
@@ -194,13 +168,33 @@ def plot_mc_style(fig, ax, hist, binning, label, color):
                        label=label)
         return obj, label
 
-def plot_uncertainties(hist, bin_center, bin_width, y_err):
+
+def plot_uncertainties(fig, ax, hist, uncert, binning,
+                       label, color, cmap, alphas):
+    cmap = plt.get_cmap(cmap)
     colors = cmap(np.linspace(0.1, 0.9, len(alphas)))
+    legend_entries = []
+    legend_labels = []
+    legend_entries.append(le.UncertObject(colors, color))
+    legend_labels.append(label)
+    for i, (c, a) in enumerate(zip(colors[::-1], alphas[::-1])):
+        lower_limit = uncert[:, i, 0]
+        upper_limit = uncert[:, i, 1]
+        ax.fill_between(
+            binning,
+            np.append(lower_limit[0], lower_limit),
+            np.append(upper_limit[0], upper_limit),
+            step='pre',
+            color=c)
+    for i, (c, a) in enumerate(zip(colors, alphas)):
+        legend_entries.append(le.UncertObject_single(c))
+        legend_labels.append('      %.1f%% Uncert.' % (a * 100.))
+    return legend_entries, legend_labels
 
 
 def save_fig(fig, name, tight=True):
     if tight:
-        fig.savefig(name+'.png', bbox_inches='tight')
+        fig.savefig(name + '.png', bbox_inches='tight')
     else:
-        fig.savefig(name+'.png')
+        fig.savefig(name + '.png')
     plt.close(fig)

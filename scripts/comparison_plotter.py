@@ -3,20 +3,17 @@
 from __future__ import division, print_function
 
 import os
-import warnings
 
 from tqdm import tqdm
 
 import numpy as np
-import tables
-
-from matplotlib import pyplot as plt
 
 import data_handler as dh
 from .aggregation_math import aggregate
 from .aggarwal_err import calc_limits
 import plot_funcs
 import scripts.config_parser_helper as ch
+
 
 class ComparisonPlotter:
     def __init__(self,
@@ -55,7 +52,7 @@ class ComparisonPlotter:
         list_data = [str(c) for c in self.data_components]
         list_plot = [str(c) for c in self.plotting_components]
         hists = np.empty((len(self.data_components), n_obs, self.n_bins))
-        binnings = np.empty((n_obs, self.n_bins+1))
+        binnings = np.empty((n_obs, self.n_bins + 1))
         trans_obs = []
         obs_keys = []
         cols_mask = []
@@ -70,12 +67,14 @@ class ComparisonPlotter:
                         if i == 0:
                                 obs_keys.append(obs_key)
                                 cols_mask.append(True)
-                                transformed_obs_key = dh.transform_obs(obs_key, t)
+                                transformed_obs_key = dh.transform_obs(
+                                    obs_key, t)
                                 trans_obs.append(transformed_obs_key)
                         if cols_mask[current_col]:
                             vals, weights = dh.filter_nans(all_values[:, j],
                                                            comp.weight)
-                            vals = dh.transform_values(vals, t)
+                            vals, weights = dh.transform_values(t, vals,
+                                                                weights)
                             if i == 0:
                                 if len(vals) == 0:
                                     cols_mask[current_col] = False
@@ -115,7 +114,6 @@ class ComparisonPlotter:
                         plotting_keys,
                         transformed_keys,
                         alphas)
-
 
     def get_possiblites(self,
                         outpath,

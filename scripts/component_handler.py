@@ -7,7 +7,7 @@ import warnings
 import numpy as np
 import tables
 
-from .plot_funcs import get_color
+from .plot_funcs import get_color, get_cmap
 from .aggregation_math import get_participants
 import data_handler as dh
 from .config_parser_helper import split_obs_str, convert_list
@@ -61,10 +61,18 @@ class Component:
         self.ids = self.ID()
 
         self.show = True
-        self.calc_uncertainties = False
 
         self.hists = None
         self.uncertainties = None
+        self.calc_uncertainties = False
+        self.cmap = False
+
+    def calc_uncert(self, calc=False):
+        self.calc_uncertainties = calc
+        if self.calc_uncertainties:
+            self.cmap = get_cmap()
+
+
 
     def init_component(self, id_dict):
         if self.aggregation is None:

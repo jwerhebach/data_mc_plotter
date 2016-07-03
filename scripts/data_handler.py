@@ -2,15 +2,15 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function
 
-import warnings
 import numpy as np
-import tables
+
 
 def get_values_from_table(table, cols, dtype=float):
     values = np.empty((table.nrows, len(cols)), dtype=float)
     for i, row in enumerate(table.iterrows()):
         values[i, :] = [row[col] for col in cols]
     return values
+
 
 def filter_nans(values, weights=None):
     nan_mask = ~np.isnan(values)
@@ -23,22 +23,35 @@ def filter_nans(values, weights=None):
         values = values[filter_mask]
         return values, weights.reshape(values.shape)
 
-def transform_values(values, transformation):
+
+def filter_non_pos(values, weights=None):
+    filter_mask = values > 0
+    if weights is None:
+        return values[filter_mask], None
+    else:
+        weights = weights[filter_mask]
+        values = values[filter_mask]
+        return values, weights.reshape(values.shape)
+
+
+def transform_values(transformation, values, weights=None):
     if (transformation is None) or (transformation == 'None'):
-        return values
+        return values, weights
     elif (transformation == 'log') or (transformation == 'log10'):
-        return np.log10(values)
+        values, weights = filter_non_pos(values, weights)
+        return np.log10(values), weights
     elif (transformation == 'cos'):
-        return np.cos(values)
+        return np.cos(values), weights
     elif (transformation == 'cosdeg'):
         return np.cos(np.deg2rad(values))
     elif (transformation == 'sin'):
-        return np.sin(values)
+        return np.sin(values), weights
     elif (transformation == 'sindeg'):
-        return np.sin(np.deg2rad(values))
+        return np.sin(np.deg2rad(values)), weights
     else:
         print('Invalid transformation \'%s\'' % transformation)
-        return values
+        return values, weights
+
 
 def transform_obs(observable, transformation):
     if (transformation is None) or (transformation == 'None'):
