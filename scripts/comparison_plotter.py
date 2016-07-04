@@ -45,7 +45,7 @@ class ComparisonPlotter:
             else:
                 self.cmds.append(c.aggregation.cmd)
 
-    def plot(self, observables, outpath, alphas=[]):
+    def plot(self, title, observables, outpath, alphas=[]):
         observables = ch.split_obs_str(observables)
         print('Fetching Observable infos')
         n_obs = np.sum([len(observables[k][0]) for k in observables.keys()])
@@ -112,8 +112,8 @@ class ComparisonPlotter:
                     comp.uncertainties = calc_limits(comp.hists,
                                                      alphas)
         plotting_hists /= self.livetime
-
         plot_funcs.plot(outpath,
+                        title,
                         self.plotting_components,
                         binnings,
                         plotting_keys,

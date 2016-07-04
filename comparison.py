@@ -113,6 +113,11 @@ if __name__ == '__main__':
                                      match=False,
                                      n_bins=50)
 
+    if config.has_option('General', 'Title'):
+        title = config.get('General', 'Title')
+    else:
+        title = ''
+
     if opts.possible or obs == '*':
         blacklist = {'obs': [],
                      'tabs': [],
@@ -141,6 +146,9 @@ if __name__ == '__main__':
                                            blacklist=blacklist)
         if opts.possible:
             sys.exit()
-    comp_plotter.plot(observables=obs,
+
+
+    comp_plotter.plot(title=title,
+                      observables=obs,
                       outpath=outpath,
                       alphas=alphas)

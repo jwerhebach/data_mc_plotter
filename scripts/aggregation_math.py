@@ -8,7 +8,7 @@ from copy import deepcopy
 OPS = ['*', '/', '+', '-']
 
 
-def interpretate(s):
+def interpret(s):
     i = 0
     while True:
         if i < len(s):
@@ -34,18 +34,18 @@ def interpretate(s):
     return s
 
 
-def interpretate_rec(s):
+def interpret_rec(s):
     if not isinstance(s, list):
         s = [s]
-    s_new = interpretate(s)
+    s_new = interpret(s)
     if s != s_new:
-        return interpretate_rec(s_new)
+        return interpret_rec(s_new)
     else:
         return s
 
 
 def get_calc_steps(s):
-    s = interpretate_rec(s)
+    s = interpret_rec(s)
     if len(s) == 1:
         return None
     steps = []
@@ -71,7 +71,7 @@ def get_calc_steps(s):
     return steps
 
 def get_participants(cmd):
-    splitted = interpretate_rec(cmd)
+    splitted = interpret_rec(cmd)
     for o in OPS:
         splitted = [s for s in splitted if s != o]
     return splitted

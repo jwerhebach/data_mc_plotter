@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function
 
+import os
+
 import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.patches as mpatches
-
-import os
+from tqdm import tqdm
 
 import legend_entries as le
 
@@ -35,7 +36,6 @@ get_color.pointer = -1
 
 uncertainties_cycle = ['plasma_r',
                        'viridis_r',
-
                        'magma_r',
                        'inferno_r']
 
@@ -54,6 +54,7 @@ ZORDER = 2
 
 
 def plot(output,
+         title,
          components,
          binnings,
          plotting_keys,
@@ -62,54 +63,59 @@ def plot(output,
          alphas):
     legend_objects = []
     legend_labels = []
-    for i, o in enumerate(obs_keys):
-
-        fig, ax = plt.subplots()
-        binning = binnings[i]
-        ax.set_xlim(binning[0], binning[-1])
-        ax.set_yscale("log", nonposy='clip')
-        for j, c in enumerate(components):
-            hist = c.hists[i, :]
-            if c.ctype == 'Data':
-                obj, lab = plot_data_style(fig,
-                                           ax,
-                                           hist,
-                                           binning,
-                                           c.label,
-                                           c.color)
-                if i == 0:
-                    legend_objects.append(obj)
-                    legend_labels.append(lab)
-            if c.ctype == 'MC':
-                if c.uncertainties is None:
-                    obj, lab = plot_mc_style(fig,
-                                             ax,
-                                             hist,
-                                             binning,
-                                             c.label,
-                                             c.color)
+    n_obs = len(obs_keys)
+    print('Plot Observables')
+    with tqdm(total=n_obs, unit='Observables') as pbar:
+        for i, o in enumerate(obs_keys):
+            fig, ax = plt.subplots()
+            binning = binnings[i]
+            ax.set_xlim(binning[0], binning[-1])
+            ax.set_yscale("log", nonposy='clip')
+            for j, c in enumerate(components):
+                hist = c.hists[i, :]
+                if c.ctype == 'Data':
+                    obj, lab = plot_data_style(fig,
+                                               ax,
+                                               hist,
+                                               binning,
+                                               c.label,
+                                               c.color)
                     if i == 0:
                         legend_objects.append(obj)
                         legend_labels.append(lab)
-                else:
-                    uncert = c.uncertainties[i, :]
-                    obj, lab = plot_uncertainties(fig,
-                                                  ax,
-                                                  hist,
-                                                  uncert,
-                                                  binning,
-                                                  c.label,
-                                                  c.color,
-                                                  c.cmap,
-                                                  alphas)
-                    if i == 0:
-                        legend_objects.extend(obj)
-                        legend_labels.extend(lab)
-        ax.legend(legend_objects, legend_labels, handler_map=le.handler_mapper,
-                  loc='best')
-        ax.set_xlabel(transformed_keys[i])
-        ax.set_ylabel('# Entries [Hz]')
-        save_fig(fig, os.path.join(output, obs_keys[i]), tight=True)
+                if c.ctype == 'MC':
+                    if c.uncertainties is None:
+                        obj, lab = plot_mc_style(fig,
+                                                 ax,
+                                                 hist,
+                                                 binning,
+                                                 c.label,
+                                                 c.color)
+                        if i == 0:
+                            legend_objects.append(obj)
+                            legend_labels.append(lab)
+                    else:
+                        uncert = c.uncertainties[i, :]
+                        obj, lab = plot_uncertainties(fig,
+                                                      ax,
+                                                      hist,
+                                                      uncert,
+                                                      binning,
+                                                      c.label,
+                                                      c.color,
+                                                      c.cmap,
+                                                      alphas)
+                        if i == 0:
+                            legend_objects.extend(obj)
+                            legend_labels.extend(lab)
+            ax.legend(legend_objects, legend_labels,
+                      handler_map=le.handler_mapper,
+                      loc='best')
+            ax.set_xlabel(transformed_keys[i])
+            ax.set_ylabel('# Entries [Hz]')
+            fig.suptitle('', fontsize=20)
+            save_fig(fig, os.path.join(output, obs_keys[i]), tight=True)
+            pbar.update(1)
 
 
 def plot_data_style(fig, ax, hist, binning, label, color):
