@@ -1,5 +1,12 @@
 # data_mc_plotter
 
+Run
+```
+python comparison -n test /-c ~/test.ini [-f]
+```
+* -n test /-c ~/test.ini: Config can be given by name, when it is ini the config folder (-n) or with the direct paht (-c)
+* -f: Replace results in the output folder. In not -f a folder new folder will be created
+
 Short explanation of how to write a config.
 
 ## Definiton of the General Options
