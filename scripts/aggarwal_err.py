@@ -35,18 +35,28 @@ def calc_limits(mu, alphas=0.68268949):
         upper = [slice(None) for _ in range(len(mu.shape))]
         upper.append(1)
         lim[lower], lim[upper] = sc_dist.poisson.interval(alphas, mu)
-        return lim / mu
+        zero_mask = mu > 0.
+        return lim[zero_mask] / mu[zero_mask]
     else:
         lim_shape = list(mu.shape) + [len(alphas), 2]
+        mu_shape = mu.shape
         lim = np.zeros(lim_shape)
         for i, a in enumerate(alphas):
             lower = [slice(None) for _ in range(len(mu.shape))]
             lower.extend([i, 0])
             upper = [slice(None) for _ in range(len(mu.shape))]
             upper.extend([i, 1])
-            lim_lower, lim_upper = sc_dist.poisson.interval(a, mu)
-            lim[lower] = lim_lower / mu
-            lim[upper] = lim_upper / mu
+            zero_mask = mu > 0.
+            flat_mu = mu.reshape(np.prod(mu_shape))
+            flat_mask = zero_mask.reshape(np.prod(mu_shape))
+            lim_lower, lim_upper = sc_dist.poisson.interval(a,
+                                                            flat_mu[flat_mask])
+            lim_lower_t = np.zeros_like(flat_mask, dtype=float)
+            lim_upper_t = np.zeros_like(flat_mask, dtype=float)
+            lim_lower_t[flat_mask] = lim_lower / flat_mu[flat_mask]
+            lim_upper_t[flat_mask] = lim_upper / flat_mu[flat_mask]
+            lim[lower] = lim_lower_t.reshape(mu_shape)
+            lim[upper] = lim_upper_t.reshape(mu_shape)
         return lim
 
 

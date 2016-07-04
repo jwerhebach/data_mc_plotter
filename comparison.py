@@ -87,6 +87,12 @@ if __name__ == '__main__':
                     components[index].show = False
                 curr_component.aggregation.participant[i] = components[index]
 
+    if config.has_option('General', 'Alphas'):
+        alphas_ops = config.get('General', 'Alphas')
+        alphas = [float(a) for a in ch.convert_list(alphas_ops)]
+    else:
+        alphas = [0.682689492, 0.9, 0.99]
+
     if config.has_option('General', 'IDKeys'):
         id_keys_opts = config.get('General', 'IDKeys')
         id_keys = ch.convert_list(id_keys_opts)
@@ -99,15 +105,7 @@ if __name__ == '__main__':
         if obs_opts not in ['all', '*']:
             obs = ch.convert_list(obs_opts)
 
-    if config.has_option('General', 'Uncertainties'):
-        uncertainties_opts = config.get('General', 'Uncertainties')
-        uncertainties = ch.convert_list(uncertainties_opts)
-        for c in uncertainties:
-            components[components.index(c)].calc_uncert(True)
-        alphas_ops = config.get('General', 'Alphas')
-        alphas = [float(a) for a in ch.convert_list(alphas_ops)]
-    else:
-        alphas = []
+
     comp_plotter = ComparisonPlotter(components,
                                      id_keys,
                                      match=False,

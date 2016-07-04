@@ -92,7 +92,10 @@ class ComparisonPlotter:
                                     hists[i, current_col, :] = hist * self.livetime
                                 else:
                                     hists[i, current_col, :] = hist
-
+                                if any(np.isnan(hists[i, current_col, :])):
+                                    print('ALARM')
+                                    print(obs_key)
+                finished_cols += len(cols)
                 pbar.update(len(cols))
         hists = hists[:, np.where(cols_mask)[0], :]
         plotting_hists = aggregate(hists,

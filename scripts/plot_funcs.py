@@ -73,41 +73,42 @@ def plot(output,
             ax.set_yscale("log", nonposy='clip')
             for j, c in enumerate(components):
                 hist = c.hists[i, :]
-                if c.ctype == 'Data':
-                    obj, lab = plot_data_style(fig,
-                                               ax,
-                                               hist,
-                                               binning,
-                                               c.label,
-                                               c.color)
-                    if i == 0:
-                        legend_objects.append(obj)
-                        legend_labels.append(lab)
-                if c.ctype == 'MC':
-                    if c.uncertainties is None:
-                        obj, lab = plot_mc_style(fig,
-                                                 ax,
-                                                 hist,
-                                                 binning,
-                                                 c.label,
-                                                 c.color)
+                if not all(hist == 0.):
+                    if c.ctype == 'Data':
+                        obj, lab = plot_data_style(fig,
+                                                   ax,
+                                                   hist,
+                                                   binning,
+                                                   c.label,
+                                                   c.color)
                         if i == 0:
                             legend_objects.append(obj)
                             legend_labels.append(lab)
-                    else:
-                        uncert = c.uncertainties[i, :]
-                        obj, lab = plot_uncertainties(fig,
-                                                      ax,
-                                                      hist,
-                                                      uncert,
-                                                      binning,
-                                                      c.label,
-                                                      c.color,
-                                                      c.cmap,
-                                                      alphas)
-                        if i == 0:
-                            legend_objects.extend(obj)
-                            legend_labels.extend(lab)
+                    if c.ctype == 'MC':
+                        if c.uncertainties is None:
+                            obj, lab = plot_mc_style(fig,
+                                                     ax,
+                                                     hist,
+                                                     binning,
+                                                     c.label,
+                                                     c.color)
+                            if i == 0:
+                                legend_objects.append(obj)
+                                legend_labels.append(lab)
+                        else:
+                            uncert = c.uncertainties[i, :]
+                            obj, lab = plot_uncertainties(fig,
+                                                          ax,
+                                                          hist,
+                                                          uncert,
+                                                          binning,
+                                                          c.label,
+                                                          c.color,
+                                                          c.cmap,
+                                                          alphas)
+                            if i == 0:
+                                legend_objects.extend(obj)
+                                legend_labels.extend(lab)
             ax.legend(legend_objects, legend_labels,
                       handler_map=le.handler_mapper,
                       loc='best')
@@ -172,13 +173,17 @@ def plot_zero_marker(fig, ax, binning, zero_mask, markeredgecolor='k',
 def plot_mc_style(fig, ax, hist, binning, label, color, linewidth=None):
         if linewidth is None:
             linewidth = LW
-        obj, = ax.plot(binning,
-                       np.append(hist[0], hist),
-                       drawstyle='steps-pre',
-                       lw=linewidth,
-                       c=color,
-                       label=label,
-                       zorder=ZORDER)
+        try:
+          obj, = ax.plot(binning,
+                        np.append(hist[0], hist),
+                        drawstyle='steps-pre',
+                        lw=linewidth,
+                        c=color,
+                        label=label,
+                        zorder=ZORDER)
+        except ValueError:
+            print(hist)
+            exit()
         return obj, label
 
 
