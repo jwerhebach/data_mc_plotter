@@ -33,8 +33,9 @@ def get_color():
 
 get_color.pointer = -1
 
-uncertainties_cycle = ['viridis_r',
-                       'plasma_r',
+uncertainties_cycle = ['plasma_r',
+                       'viridis_r',
+
                        'magma_r',
                        'inferno_r']
 
@@ -47,9 +48,8 @@ def get_cmap():
 
 get_cmap.pointer = -1
 
-lw = 2.
-ms = '5'
-edgecolor_data = 'k'
+LW = 2.
+MS = '5'
 ZORDER = 2
 
 
@@ -120,7 +120,7 @@ def plot_data_style(fig, ax, hist, binning, label, color):
     markerfacecolor = color
     ax.plot(bin_center[zero_mask],
             hist[zero_mask],
-            ls='', ms=ms,
+            ls='', ms=MS,
             mew=1.,
             marker='o',
             markeredgecolor=markeredgecolor,
@@ -165,7 +165,7 @@ def plot_zero_marker(fig, ax, binning, zero_mask, markeredgecolor='k',
 
 def plot_mc_style(fig, ax, hist, binning, label, color, linewidth=None):
         if linewidth is None:
-            linewidth = lw
+            linewidth = LW
         obj, = ax.plot(binning,
                        np.append(hist[0], hist),
                        drawstyle='steps-pre',
@@ -184,7 +184,7 @@ def plot_uncertainties(fig, ax, hist, uncert, binning,
                          binning,
                          label,
                          color,
-                         linewidth=lw - 1.)
+                         linewidth=LW - 1.)
     n_alphas = len(alphas)
     cmap = plt.get_cmap(cmap)
     colors = cmap(np.linspace(0.1, 0.9, len(alphas)))
