@@ -113,8 +113,8 @@ def plot(output,
                       loc='best')
             ax.set_xlabel(transformed_keys[i])
             ax.set_ylabel('# Entries [Hz]')
-            fig.suptitle('', fontsize=20)
-            save_fig(fig, os.path.join(output, obs_keys[i]), tight=True)
+            fig.suptitle(title, fontsize=14)
+            save_fig(fig, os.path.join(output, obs_keys[i]), tight=False)
             pbar.update(1)
 
 

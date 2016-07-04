@@ -1,6 +1,8 @@
 # data_mc_plotter
 
-Short explanation of how to write a config
+Short explanation of how to write a config.
+
+## Definiton of the General Options
 ```
 [General]
 Components: SumMC,IC86II
@@ -13,15 +15,25 @@ Observables: [SplineMPETruncatedEnergy_SPICEMie_DOMS_Neutrino.energy.log,
 Uncertainties: SumMC
 Alphas: 0.682689492, 0.9, 0.99
 ```
+* Components: Components that should be plotted names refer to the definitions of the components in the ini
+* Title: Title shown at the top of the plot
+* IDKeys: Keys in to match different tables
+* Outpath: Default is 'None' and the results we be saved in the folder output
+* Observables: List of observables <TableName>.<ColumnName>.<Transformation>. Possible Transformations .log/.sin/.sindeg/.cos/.cosdeg. * can be used when all components should be plotted
+* Uncertainties: Component for which Uncertainties is shown
+* Alphas: Confidence-Levels shown
 
-
-
-
+```
 [Blacklist]
 Columns: [SubEventStream, fit_status, type, time, pdg_encoding, exists]
 Tables: [I3EventHeader, SRTHVInIcePulses]
 Observales: None
+```
+When * is Used für Observables. Columns/Tables/Observables can be blacklisted.
 
+## Definition of componets
+
+```
 [11374_baseline]
 Type: MC
 Label: Muon Neutrino NuGen
@@ -65,3 +77,15 @@ Label: Sum Simulation
 Aggregation: 11058+11057+11374_baseline
 KeepComponents: False
 Color: w
+```
+
+* [<ComponentName>]: Name used to internal reference of the different components
+* Type: Possible types are Data/MC
+* Label: Name shown in the legend
+* Directory: Directory/Filepattern used to find files (runs glob for the path)
+* FileList: [File1, File2] specific files
+* MaxFiles: Maximum number of files when used directory
+* Livetime: Livetime of the component
+* Color: Matplotlibname or hexcode to specify the color of the component
+* Aggregation: <Comp1>+<Comp2>-<Comp3> possible operators (+, -, *, /)
+* KeepComponents: Whether the components used for the aggregation should be shown in the plot
