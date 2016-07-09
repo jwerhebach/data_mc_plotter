@@ -20,20 +20,27 @@ class ComparisonPlotter:
                  components,
                  id_keys,
                  match=False,
-                 n_bins=50):
+                 autotransform=False,
+                 n_bins=50,
+                 alphas=[0.682689492, 0.9, 0.99]):
         self.components = components
         self.id_dict = ch.split_obs_str(id_keys)
         assert len(self.id_dict.keys()) == 1, \
             'id_keys have to be from one table!'
         self.id_cols = self.id_dict[self.id_dict.keys()[0]][0]
         self.match = match
+        self.autotransform = autotransform
         self.n_bins = n_bins
-        self.livetime = 0.
+        self.alphas = sorted(alphas)
+
+        self.data_livetime = 0.
+        self.n_events_data = 0
 
         for i, c in enumerate(components):
             c.init_component(self.id_dict)
             if c.ctype == 'Data':
-                self.livetime += c.livetime
+                self.data_livetime += c.livetime
+                self.n_events_data = c.get_nevents()
         self.data_components = [c for c in self.components
                                 if c.aggregation is None]
         self.plotting_components = [c for c in self.components
@@ -45,22 +52,78 @@ class ComparisonPlotter:
             else:
                 self.cmds.append(c.aggregation.cmd)
 
-    def plot(self, title, observables, outpath, alphas=[]):
+    def auto_scale(self, scaling_list):
+        for c_i in scaling_list:
+            index = self.components.index(c_i)
+            curr_component = self.components[index]
+            sum_w_i = curr_component.get_nevents(weighted=True)
+            n_events_i = sum_w_i * self.data_livetime
+            scaling_factor = self.n_events_data/n_events_i
+            curr_component.set_scaling(scaling_factor)
+            print('Scaling for \'%s\' set to: %.4f' % (c_i, scaling_factor))
+
+    def fetch_data_and_plot(self, title, observables, outpath):
         observables = ch.split_obs_str(observables)
         print('Fetching Observable infos')
         n_obs = np.sum([len(observables[k][0]) for k in observables.keys()])
         list_data = [str(c) for c in self.data_components]
         list_plot = [str(c) for c in self.plotting_components]
-        hists = np.empty((len(self.data_components), n_obs, self.n_bins))
-        binnings = np.empty((n_obs, self.n_bins + 1))
-        trans_obs = []
+        hists = np.zeros((len(self.data_components), n_obs, self.n_bins))
+        binnings = np.zeros((n_obs, self.n_bins + 1))
+        trans_obs_keys = []
         obs_keys = []
-        cols_mask = []
+        cols_mask = np.ones(n_obs, dtype=bool)
         finished_cols = 0
         with tqdm(total=n_obs, unit='Observables') as pbar:
             for table_key, [cols, trans] in observables.iteritems():
-                for i, comp in enumerate(self.data_components):
-                    all_values = comp.get_values(table_key, cols)
+                all_values = []
+                for comp in self.data_components:
+                    all_values.append(comp.get_values(table_key, cols))
+                for j, [col, trafo] in enumerate(zip(cols, trans)):
+                    val = all_values[i][: ,]
+                    mean_all = 0.
+                    sum_w_all = 0.
+                    min_vals = []
+                    max_vals = []
+                    for i, comp in enumerate(self.data_components):
+                        val = all_values[i][:, j] =
+
+                        min_j, max_j, mean = self.get_stat_infos
+                        min_vals.append(min_j)
+                        max_vals.append(max_j)
+                        sum_w_j = self.comp.get_nevents(weighted=True)
+                        mean_all += mean*sum_w_j
+                        sum_w_all += sum_w_j
+
+
+                    min_all = min(min_vals)
+                    max_all = max(max_vals)
+                    mean_all /= sum_wall
+                    if self.autotransform:
+                        trafo = None
+
+
+                    obs_key = '%s.%s' % (table_key, c)
+                    trans_obs_keys.append(dh.transform_obs(obs_key, trafo))
+                    obs_keys.append(obs_key)
+                    [min_all, max_all] = dh.transform_values(trafo,
+                                                             [min_all,
+                                                              max_all])
+                    vals, weights = dh.transform_values(t, all_values[j],
+                                                           weights)
+
+                finished_cols += len(cols)
+                pbar.update(len(cols))
+
+
+
+
+
+
+
+
+                if True:
+                    comp_values = comp.get_values(table_key, cols)
                     for j, [c, t] in enumerate(zip(cols, trans)):
                         current_col = finished_cols + j
                         obs_key = '%s.%s' % (table_key, c)
@@ -92,11 +155,12 @@ class ComparisonPlotter:
                                     hists[i, current_col, :] = hist * self.livetime
                                 else:
                                     hists[i, current_col, :] = hist
-                                if any(np.isnan(hists[i, current_col, :])):
-                                    print('ALARM')
-                                    print(obs_key)
                 finished_cols += len(cols)
                 pbar.update(len(cols))
+
+
+
+
         hists = hists[:, np.where(cols_mask)[0], :]
         plotting_hists = aggregate(hists,
                                    self.cmds,
@@ -111,9 +175,8 @@ class ComparisonPlotter:
             comp.hists = plotting_hists[i, :, :]
             if comp.calc_uncertainties:
                 if len(alphas) > 0:
-                    alphas = sorted(alphas)
                     comp.uncertainties = calc_limits(comp.hists,
-                                                     alphas)
+                                                     self.alphas)
         plotting_hists /= self.livetime
         plot_funcs.plot(outpath,
                         title,

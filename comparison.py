@@ -109,7 +109,8 @@ if __name__ == '__main__':
     comp_plotter = ComparisonPlotter(components,
                                      id_keys,
                                      match=False,
-                                     n_bins=50)
+                                     n_bins=50,
+                                     alphas=alphas)
 
     if config.has_option('General', 'Title'):
         title = config.get('General', 'Title')
@@ -145,8 +146,16 @@ if __name__ == '__main__':
         if opts.possible:
             sys.exit()
 
+    if config.has_option('General', 'AutoScale'):
+        scaling_comps_opts = config.get('General', 'AutoScale')
+        scaling_comps = ch.convert_list(scaling_comps_opts)
+        comp_plotter.auto_scale(scaling_comps)
+        comp_plotter.auto_scale(scaling_comps)
+        comp_plotter.auto_scale(scaling_comps)
 
-    comp_plotter.plot(title=title,
-                      observables=obs,
-                      outpath=outpath,
-                      alphas=alphas)
+
+    exit()
+    comp_plotter.fetch_data_and_plot(title=title,
+                                     observables=obs,
+                                     outpath=outpath,
+                                     alphas=alphas)

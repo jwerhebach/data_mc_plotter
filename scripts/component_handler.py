@@ -21,6 +21,7 @@ class Component:
         self.ctype = option_dict['type']
         self.label = option_dict['label']
         self.color = option_dict.get('color', None)
+
         directory = option_dict.get('directory', None)
         file_list = option_dict.get('filelist', None)
         max_files = int(option_dict.get('maxfiles', -1))
@@ -43,6 +44,7 @@ class Component:
             if self.weight in ['none', 'None', 'NONE']:
                 self.weight = None
             self.file_list = file_list
+            self.scaling_factor = float(option_dict.get('scale', 1.))
         else:
             keep_components = option_dict.get('keepcomponents', False)
             if isinstance(keep_components, str):
@@ -55,6 +57,7 @@ class Component:
             self.file_list = None
             self.livetime = None
             self.weight = None
+
         if self.color is None:
             self.color = get_color()
 
@@ -83,7 +86,14 @@ class Component:
                 weight_table = weight_dict.keys()[0]
                 cols = weight_dict[weight_table][0]
                 self.weight = self.get_values(weight_table, cols)
+            else:
+                self.weight = np.ones(self.get_nevents(), dtype=float)
+            if self.ctype == 'MC':
                 self.weight /= self.livetime
+            self.weight *= self.scaling_factor
+            self.scaling_factor = 1.
+            self.nevents_weighted = np.sum(self.weight)
+
 
     def get_values(self, table_key, cols):
         n_events = self.get_nevents()
@@ -192,16 +202,45 @@ class Component:
     def __repr__(self):
         return '%s (%s)' % (self.name, self.ctype)
 
-    def get_nevents(self):
-        if self.aggregation is not None:
-            n_events = 0
-            for c in self.aggregation.participant:
-                n_events += c.get_nevents()
-            return n_events
-        elif self.ids.ids is None:
-            return None
+    def get_nevents(self, weighted=False):
+        if weighted:
+            if self.aggregation is not None:
+                n_events = 0.
+                for c in self.aggregation.participant:
+                    n_events += c.get_nevents(weighted=True)
+                return n_events
+            elif self.weight is not None:
+                return self.nevents_weighted
+            else:
+                return float(len(self.ids.ids))
         else:
-            return len(self.ids.ids)
+            if self.aggregation is not None:
+                n_events = 0
+                for c in self.aggregation.participant:
+                    n_events += c.get_nevents()
+                return n_events
+            elif self.ids.ids is None:
+                return None
+            else:
+                return len(self.ids.ids)
+
+    def set_scaling(self, scaling_factor):
+        if self.aggregation is None:
+            self.scaling_factor *= scaling_factor
+            if self.weight is not None:
+                self.weight *= self.scaling_factor
+                self.scaling_factor = 1.
+                self.nevents_weighted = np.sum(self.weight)
+            elif self.get_nevents() is not None:
+                self.weight = np.ones(self.get_nevents()) * \
+                    self.scaling_factor
+                self.scaling_factor = 1.
+                self.nevents_weighted = np.sum(self.weight)
+
+        else:
+            for c in self.aggregation.participant:
+                c.set_scaling(scaling_factor)
+
 
     class Aggregation:
         def __init__(self, cmd, keep_components):
