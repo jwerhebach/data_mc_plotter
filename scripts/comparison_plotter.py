@@ -148,6 +148,7 @@ class ComparisonPlotter:
                                     else:
                                         binnings[current_col] = binning
                             if cols_mask[current_col]:
+                                print(binnings[j])
                                 hist = np.histogram(vals,
                                                     bins=binnings[j],
                                                     weights=weights)[0]
