@@ -58,7 +58,7 @@ class ComparisonPlotter:
             curr_component = self.components[index]
             sum_w_i = curr_component.get_nevents(weighted=True)
             n_events_i = sum_w_i * self.data_livetime
-            scaling_factor = self.n_events_data/n_events_i
+            scaling_factor = self.n_events_data / n_events_i
             curr_component.set_scaling(scaling_factor)
             print('Scaling for \'%s\' set to: %.4f' % (c_i, scaling_factor))
 
@@ -68,61 +68,83 @@ class ComparisonPlotter:
         n_obs = np.sum([len(observables[k][0]) for k in observables.keys()])
         list_data = [str(c) for c in self.data_components]
         list_plot = [str(c) for c in self.plotting_components]
+        n_events = np.asarray(
+            [c.get_nevents(weighted=True) for c in self.data_components])
         hists = np.zeros((len(self.data_components), n_obs, self.n_bins))
         binnings = np.zeros((n_obs, self.n_bins + 1))
         trans_obs_keys = []
         obs_keys = []
-        cols_mask = np.ones(n_obs, dtype=bool)
+        cols_mask = np.zeros(n_obs, dtype=bool)
         finished_cols = 0
         with tqdm(total=n_obs, unit='Observables') as pbar:
-            for table_key, [cols, trans] in observables.iteritems():
-                all_values = []
-                for comp in self.data_components:
-                    all_values.append(comp.get_values(table_key, cols))
-                for j, [col, trafo] in enumerate(zip(cols, trans)):
-                    val = all_values[i][: ,]
-                    mean_all = 0.
-                    sum_w_all = 0.
-                    min_vals = []
-                    max_vals = []
-                    for i, comp in enumerate(self.data_components):
-                        val = all_values[i][:, j] =
+            for table_key, [cols, trafos] in observables.iteritems():
+                all_values = {}
+                limits = np.ones((len(self.data_components),
+                                  len(cols),
+                                  2))
+                limits[:, :, 0] = np.inf
+                limits[:, :, 1] = -np.inf
+                medians = np.ones((len(self.data_components),
+                                  len(cols)))
+                for i, comp in enumerate(self.data_components):
+                    all_values[comp.name] = {}
+                    comp_values = comp.get_values(table_key, cols)
+                    for j, col in enumerate(cols):
+                        if cols_mask[finished_cols + j]:
+                            filter_mask = dh.filter_nans(comp_values[:, j],
+                                                         return_mask=True)
+                            if np.sum(filter_mask) > 0:
+                                all_values[comp.name][col] = {}
+                                col_dict = all_values[comp.name][col]
+                                vals = comp_values[:, i][filter_mask]
+                                col_dict['values'] = vals
+                                col_dict['filter_mask'] = filter_mask
+                                limits[i, j, 0] = np.min(vals)
+                                limits[i, j, 1] = np.max(vals)
+                                if self.autotransform:
+                                    medians[i, j] = np.median(vals)
+                            else:
+                                cols_mask[finished_cols + j] = False
+                min_vals = np.min(limits[:, :, 0], axis=0)
+                max_vals = np.min(limits[:, :, 1], axis=0)
+                for j, [col, trafo] in enumerate(zip(cols, trafos)):
+                    current_col = finished_cols + j
+                    min_val = min_vals[j]
+                    max_val = max_vals[j]
+                    if cols_mask[current_col]:
+                        diff = max_val - min_val
+                        offset = diff * 1e-5
+                        if self.autotransform:
+                            if trafo in ['None', None]:
+                                median_all = np.average(medians,
+                                                        weights=n_events)
+                            ratio_media = (median_all - min_val) / diff
+                            if ((ratio_media < 0.1) and min_val > 0):
+                                trafo = 'log10'
+                            elif np.absolute(diff - np.pi) < 1e-3:
+                                trafo = 'cos'
+                            else:
+                                trafo = None
+                        [min_val, max_val] = dh.trans_values(
+                            trafo,
+                            [min_val, max_val])
+                        binnings[current_col] = np.linspace(
+                            min_val - offset,
+                            max_val + offset,
+                            self.n_bins)
+                        for i, comp in enumerate(self.data_components):
+                            col_dict = all_values[comp.name][col]
+                            vals = dh.trans_values(trafo, col_dict['values'])
+                            weights = comp.weights[col_dict['filter_mask']]
+                            hist = np.histogram(vals,
+                                                bins=binnings[current_col],
+                                                weights=weights)[0]
+                            if comp.ctype == 'MC':
+                                hists[i, current_col, :] = hist * self.livetime
 
-                        min_j, max_j, mean = self.get_stat_infos
-                        min_vals.append(min_j)
-                        max_vals.append(max_j)
-                        sum_w_j = self.comp.get_nevents(weighted=True)
-                        mean_all += mean*sum_w_j
-                        sum_w_all += sum_w_j
 
 
-                    min_all = min(min_vals)
-                    max_all = max(max_vals)
-                    mean_all /= sum_wall
-                    if self.autotransform:
-                        trafo = None
-
-
-                    obs_key = '%s.%s' % (table_key, c)
-                    trans_obs_keys.append(dh.transform_obs(obs_key, trafo))
-                    obs_keys.append(obs_key)
-                    [min_all, max_all] = dh.transform_values(trafo,
-                                                             [min_all,
-                                                              max_all])
-                    vals, weights = dh.transform_values(t, all_values[j],
-                                                           weights)
-
-                finished_cols += len(cols)
-                pbar.update(len(cols))
-
-
-
-
-
-
-
-
-                if True:
+                if False:
                     comp_values = comp.get_values(table_key, cols)
                     for j, [c, t] in enumerate(zip(cols, trans)):
                         current_col = finished_cols + j

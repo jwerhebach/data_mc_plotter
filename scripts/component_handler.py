@@ -94,7 +94,6 @@ class Component:
             self.scaling_factor = 1.
             self.nevents_weighted = np.sum(self.weight)
 
-
     def get_values(self, table_key, cols):
         n_events = self.get_nevents()
         from_i = 0
@@ -116,7 +115,7 @@ class Component:
         if from_i != n_events:
             difference = n_events - from_i
             print('\'%s\' from \'%s\' is missing %d Events' %
-                  (table, component['dataset'], difference))
+                  (table, self.name, difference))
         return values
 
     def __get_ids__(self, id_dict):

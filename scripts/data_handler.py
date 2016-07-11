@@ -12,10 +12,12 @@ def get_values_from_table(table, cols, dtype=float):
     return values
 
 
-def filter_nans(values, weights=None):
+def filter_nans(values, weights=None, return_mask=False):
     nan_mask = ~np.isnan(values)
     finite_mask = np.isfinite(values)
     filter_mask = np.logical_and(nan_mask, finite_mask)
+    if return_mask:
+        return filter_mask
     if weights is None:
         return values[filter_mask], None
     else:
