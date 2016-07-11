@@ -150,12 +150,7 @@ if __name__ == '__main__':
         scaling_comps_opts = config.get('General', 'AutoScale')
         scaling_comps = ch.convert_list(scaling_comps_opts)
         comp_plotter.auto_scale(scaling_comps)
-        comp_plotter.auto_scale(scaling_comps)
-        comp_plotter.auto_scale(scaling_comps)
 
-
-    exit()
     comp_plotter.fetch_data_and_plot(title=title,
                                      observables=obs,
-                                     outpath=outpath,
-                                     alphas=alphas)
+                                     outpath=outpath)

@@ -29,33 +29,34 @@ def filter_nans(values, weights=None, return_mask=False):
 def filter_non_pos(values, weights=None):
     filter_mask = values > 0
     if weights is None:
-        return values[filter_mask], None
+        return values[filter_mask]
     else:
         weights = weights[filter_mask]
         values = values[filter_mask]
         return values, weights.reshape(values.shape)
 
 
-def transform_values(transformation, values, weights=None):
+def transform_values(transformation, values):
     if (transformation is None) or (transformation == 'None'):
-        return values, weights
+        return values
     elif (transformation == 'log') or (transformation == 'log10'):
-        values, weights = filter_non_pos(values, weights)
-        return np.log10(values), weights
+        values = filter_non_pos(values)
+        print(values)
+        return np.log10(values)
     elif (transformation == 'cos'):
-        return np.cos(values), weights
+        return np.cos(values)
     elif (transformation == 'cosdeg'):
         return np.cos(np.deg2rad(values))
     elif (transformation == 'sin'):
-        return np.sin(values), weights
+        return np.sin(values)
     elif (transformation == 'sindeg'):
-        return np.sin(np.deg2rad(values)), weights
+        return np.sin(np.deg2rad(values))
     else:
         print('Invalid transformation \'%s\'' % transformation)
-        return values, weights
+        return values
 
 
-def transform_obs(observable, transformation):
+def transform_obs(transformation, observable):
     if (transformation is None) or (transformation == 'None'):
         return observable
     elif (transformation == 'log') or (transformation == 'log10'):
