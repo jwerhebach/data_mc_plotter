@@ -9,6 +9,7 @@ from matplotlib import pyplot as plt
 from matplotlib.gridspec import GridSpec
 import matplotlib.patches as mpatches
 from tqdm import tqdm
+import seaborn as sns
 
 import legend_entries as le
 
@@ -52,7 +53,7 @@ get_cmap.pointer = -1
 LW = 2.
 MS = '5'
 ZORDER = 2
-RATIO=False
+RATIO=True
 
 def plot(output,
          title,
@@ -68,6 +69,7 @@ def plot(output,
     print('Plot Observables')
     with tqdm(total=n_obs, unit='Observables') as pbar:
         for i, o in enumerate(obs_keys):
+            sns.set(style='whitegrid', color_codes=True)
             if RATIO:
                 fig = plt.figure(0)
                 gs = GridSpec(2, 1, height_ratios=[3, 1])
@@ -134,6 +136,7 @@ def plot(output,
                 ax_rati.set_xlabel(transformed_keys[i])
                 ax_rati.set_ylabel('rel. dev. [%]')
                 ax_rati.set_ylim(-100., 100.)
+                plt.setp(ax.get_xticklabels(), visible=False)
             else:
                 ax.set_xlabel(transformed_keys[i])    
             ax.legend(legend_objects, legend_labels,
