@@ -12,7 +12,6 @@ import data_handler as dh
 from .aggregation_math import aggregate
 from .aggarwal_err import calc_limits
 import plot_funcs
-#import jo_plot_funcs as plot_funcs
 import scripts.config_parser_helper as ch
 
 
