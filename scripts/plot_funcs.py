@@ -6,6 +6,7 @@ import os
 
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.gridspec import GridSpec
 import matplotlib.patches as mpatches
 from tqdm import tqdm
 
@@ -34,8 +35,8 @@ def get_color():
 
 get_color.pointer = -1
 
-uncertainties_cycle = ['plasma_r',
-                       'viridis_r',
+uncertainties_cycle = ['viridis_r',
+                       'plasma_r',
                        'magma_r',
                        'inferno_r']
 
@@ -51,7 +52,7 @@ get_cmap.pointer = -1
 LW = 2.
 MS = '5'
 ZORDER = 2
-
+RATIO=False
 
 def plot(output,
          title,
@@ -67,7 +68,14 @@ def plot(output,
     print('Plot Observables')
     with tqdm(total=n_obs, unit='Observables') as pbar:
         for i, o in enumerate(obs_keys):
-            fig, ax = plt.subplots()
+            if RATIO:
+                fig = plt.figure(0)
+                gs = GridSpec(2, 1, height_ratios=[3, 1])
+                gs.update(hspace=0.07)
+                ax = plt.subplot(gs[0])
+                ax_rati = plt.subplot(gs[1], sharex=ax)
+            else:
+                fig, ax = plt.subplots()
             binning = binnings[i]
             ax.set_xlim(binning[0], binning[-1])
             ax.set_yscale("log", nonposy='clip')
@@ -75,6 +83,8 @@ def plot(output,
                 hist = c.hists[i, :]
                 if not all(hist == 0.):
                     if c.ctype == 'Data':
+                        r_data=hist
+                        r_color=c.color
                         obj, lab = plot_data_style(fig,
                                                    ax,
                                                    hist,
@@ -85,6 +95,7 @@ def plot(output,
                             legend_objects.append(obj)
                             legend_labels.append(lab)
                     if c.ctype == 'MC':
+                        r_mc=hist
                         if c.uncertainties is None:
                             obj, lab = plot_mc_style(fig,
                                                      ax,
@@ -109,14 +120,63 @@ def plot(output,
                             if i == 0:
                                 legend_objects.extend(obj)
                                 legend_labels.extend(lab)
+            if RATIO:
+                plot_ratio_uncertainties(fig,
+                                        ax_rati,
+                                        r_mc,
+                                        r_data,
+                                        uncert,
+                                        binning,
+                                        c.label,
+                                        r_color,
+                                        c.cmap,
+                                        alphas)
+                ax_rati.set_xlabel(transformed_keys[i])
+                ax_rati.set_ylabel('rel. dev. [%]')
+                ax_rati.set_ylim(-100., 100.)
+            else:
+                ax.set_xlabel(transformed_keys[i])    
             ax.legend(legend_objects, legend_labels,
                       handler_map=le.handler_mapper,
                       loc='best')
-            ax.set_xlabel(transformed_keys[i])
             ax.set_ylabel('# Entries [Hz]')
             fig.suptitle(title, fontsize=14)
             save_fig(fig, os.path.join(output, obs_keys[i]), tight=False)
             pbar.update(1)
+
+def plot_ratio_uncertainties(fig, ax, x_1, x_2, uncert, binning,
+                           label, color, cmap, alphas):
+    bin_center = (binning[1:] + binning[:-1]) / 2.
+
+    y = ((x_2 / x_1) - 1.) * 100.
+    mask = np.invert(y <= -100)
+
+    n_alphas = len(alphas)
+    cmap = plt.get_cmap(cmap)
+    colors = cmap(np.linspace(0.1, 0.9, len(alphas)))
+    for i, (c, a) in enumerate(zip(colors[::-1], alphas[::-1])):
+        j = n_alphas - i - 1
+        lower_limit = (uncert[:, j, 0] - 1) * 100
+        upper_limit = (uncert[:, j, 1] - 1) * 100
+
+        ax.fill_between(
+            binning,
+            np.append(lower_limit[0], lower_limit),
+            np.append(upper_limit[0], upper_limit),
+            step='pre',
+            color=c,
+            zorder=ZORDER)
+
+    markeredgecolor = 'k'
+    markerfacecolor = color
+    ax.plot(bin_center[mask],
+          y[mask],
+          ls='', ms=MS,
+          mew=1.,
+          marker='o',
+          markeredgecolor=markeredgecolor,
+          markerfacecolor=markerfacecolor,
+          zorder=ZORDER)
 
 
 def plot_data_style(fig, ax, hist, binning, label, color):
