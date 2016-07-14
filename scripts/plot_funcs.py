@@ -239,7 +239,7 @@ def plot_inf_marker(fig, ax, binning, zero_mask, markeredgecolor='k',
         y0 = bbox.y0 + radius
         orientation = np.pi
     else:
-        y0 = bbox.y1 + radius
+        y0 = bbox.y1 - radius
         orientation = 0
     bin_center = (binning[1:] + binning[:-1]) / 2
     binning_width = binning[-1] - binning[0]
