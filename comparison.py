@@ -105,12 +105,17 @@ if __name__ == '__main__':
         if obs_opts not in ['all', '*']:
             obs = ch.convert_list(obs_opts)
 
+    if config.has_option('General', 'PlotRatio'):
+        plot_ratios = config.getboolean('General', 'PlotRatio')
+    else:
+        plot_ratios = False
 
     comp_plotter = ComparisonPlotter(components,
                                      id_keys,
                                      match=False,
                                      n_bins=50,
-                                     alphas=alphas)
+                                     alphas=alphas,
+                                     plot_ratios=plot_ratios)
 
     if config.has_option('General', 'Title'):
         title = config.get('General', 'Title')
@@ -150,6 +155,7 @@ if __name__ == '__main__':
         scaling_comps_opts = config.get('General', 'AutoScale')
         scaling_comps = ch.convert_list(scaling_comps_opts)
         comp_plotter.auto_scale(scaling_comps)
+
 
     comp_plotter.fetch_data_and_plot(title=title,
                                      observables=obs,

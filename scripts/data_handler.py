@@ -36,24 +36,41 @@ def filter_non_pos(values, weights=None):
         return values, weights.reshape(values.shape)
 
 
-def transform_values(transformation, values):
-    if (transformation is None) or (transformation == 'None'):
+def transform_values(transformation, values, weights=None):
+    if weights is None:
+        if (transformation is None) or (transformation == 'None'):
+            return values
+        elif (transformation == 'log') or (transformation == 'log10'):
+            values = filter_non_pos(values)
+            return np.log10(values)
+        elif (transformation == 'cos'):
+            return np.cos(values)
+        elif (transformation == 'cosdeg'):
+            return np.cos(np.deg2rad(values))
+        elif (transformation == 'sin'):
+            return np.sin(values)
+        elif (transformation == 'sindeg'):
+            return np.sin(np.deg2rad(values))
+        else:
+            print('Invalid transformation \'%s\'' % transformation)
         return values
-    elif (transformation == 'log') or (transformation == 'log10'):
-        values = filter_non_pos(values)
-        print(values)
-        return np.log10(values)
-    elif (transformation == 'cos'):
-        return np.cos(values)
-    elif (transformation == 'cosdeg'):
-        return np.cos(np.deg2rad(values))
-    elif (transformation == 'sin'):
-        return np.sin(values)
-    elif (transformation == 'sindeg'):
-        return np.sin(np.deg2rad(values))
     else:
-        print('Invalid transformation \'%s\'' % transformation)
-        return values
+        if (transformation is None) or (transformation == 'None'):
+            return values, weights
+        elif (transformation == 'log') or (transformation == 'log10'):
+            values, weights = filter_non_pos(values, weights)
+            return np.log10(values), weights
+        elif (transformation == 'cos'):
+            return np.cos(values), weights
+        elif (transformation == 'cosdeg'):
+            return np.cos(np.deg2rad(values)), weights
+        elif (transformation == 'sin'):
+            return np.sin(values), weights
+        elif (transformation == 'sindeg'):
+            return np.sin(np.deg2rad(values)), weights
+        else:
+            print('Invalid transformation \'%s\'' % transformation)
+            return values, weights
 
 
 def transform_obs(transformation, observable):

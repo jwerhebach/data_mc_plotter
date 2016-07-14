@@ -22,7 +22,8 @@ class ComparisonPlotter:
                  match=False,
                  autotransform=False,
                  n_bins=50,
-                 alphas=[0.682689492, 0.9, 0.99]):
+                 alphas=[0.682689492, 0.9, 0.99],
+                 plot_ratios=True):
         self.components = components
         self.id_dict = ch.split_obs_str(id_keys)
         assert len(self.id_dict.keys()) == 1, \
@@ -51,6 +52,7 @@ class ComparisonPlotter:
                 self.cmds.append(c.name)
             else:
                 self.cmds.append(c.aggregation.cmd)
+        self.plot_ratios = plot_ratios
 
     def auto_scale(self, scaling_list):
         for c_i in scaling_list:
@@ -89,7 +91,7 @@ class ComparisonPlotter:
                 for i, comp in enumerate(self.data_components):
                     all_values[comp.name] = {}
                     comp_values = comp.get_values(table_key, cols)
-                    for j, col in enumerate(cols):
+                    for j, [col, trafo] in enumerate(zip(cols, trafos)):
                         if cols_mask[finished_cols + j]:
                             filter_mask = dh.filter_nans(comp_values[:, j],
                                                          return_mask=True)
@@ -103,6 +105,8 @@ class ComparisonPlotter:
                                 limits[i, j, 1] = np.max(vals)
                                 if self.autotransform:
                                     medians[i, j] = np.median(vals)
+                                elif trafo == 'log' and limits[i, j, 0] <= 0.:
+                                    limits[i, j, 0] = np.min(vals[vals > 0.])
                             else:
                                 cols_mask[finished_cols + j] = False
                 min_vals = np.min(limits[:, :, 0], axis=0)
@@ -114,13 +118,11 @@ class ComparisonPlotter:
                     obs_key = '%s.%s' % (table_key, col)
                     if cols_mask[current_col]:
                         diff = max_val - min_val
-                        offset = diff * 1e-5
                         if self.autotransform:
                             if trafo in ['None', None]:
                                 median_all = np.average(medians,
                                                         weights=n_events)
                             ratio_media = (median_all - min_val) / diff
-                            print(min_val)
                             if ((ratio_media < 0.1) and min_val > 0.0):
                                 trafo = 'log10'
                             elif np.absolute(diff - np.pi) < 1e-3:
@@ -130,18 +132,24 @@ class ComparisonPlotter:
                         transformed_obs_key = dh.transform_obs(trafo, obs_key)
                         obs_keys.append(obs_key)
                         transformed_obs_keys.append(transformed_obs_key)
-                        [min_val, max_val] = dh.transform_values(
+                        transformed_limits = dh.transform_values(
                             trafo,
-                            [min_val, max_val])
+                            np.asarray([min_val, max_val]))
+                        min_val = transformed_limits[0]
+                        max_val = transformed_limits[1]
+                        if max_val < min_val:
+                            max_val, min_val = min_val, max_val
+                        diff = max_val - min_val
+                        offset = diff * 1e-5
                         binnings[current_col] = np.linspace(
                             min_val - offset,
                             max_val + offset,
-                            self.n_bins+1)
+                            self.n_bins + 1)
                         for i, comp in enumerate(self.data_components):
                             col_dict = all_values[comp.name][col]
-                            vals = dh.transform_values(
-                                trafo, col_dict['values'])
                             weights = comp.weight[col_dict['filter_mask']]
+                            vals, weights = dh.transform_values(
+                                trafo, col_dict['values'], weights)
                             weights = weights.reshape(vals.shape)
                             hist = np.histogram(vals,
                                                 bins=binnings[current_col],
@@ -177,7 +185,8 @@ class ComparisonPlotter:
                         plotting_keys,
                         obs_keys,
                         transformed_keys,
-                        self.alphas)
+                        self.alphas,
+                        self.plot_ratios)
 
     def get_possiblites(self,
                         outpath,
