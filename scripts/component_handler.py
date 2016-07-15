@@ -104,8 +104,7 @@ class Component:
                 warnings.simplefilter('ignore')
                 table = f.get_node('/%s' % table_key)
             values_f = dh.get_values_from_table(table,
-                                                cols,
-                                                dtype=int)
+                                                cols)
 
             f.close()
             events_in_file = values_f.shape[0]
