@@ -5,6 +5,7 @@ from __future__ import division, print_function
 import glob
 import warnings
 import numpy as np
+from numpy.lib.recfunctions import stack_arrays
 import tables
 
 from .plot_funcs import get_color, get_cmap
@@ -105,17 +106,19 @@ class Component:
                 table = f.get_node('/%s' % table_key)
             values_f = dh.get_values_from_table(table,
                                                 cols)
-
             f.close()
-            events_in_file = values_f.shape[0]
-            to_i = from_i + events_in_file
-            values[from_i:to_i, :] = values_f
-            from_i += events_in_file
-        if from_i != n_events:
-            difference = n_events - from_i
+            if i == 0:
+                values = values_f
+            else:
+                values = stack_arrays((values, values_f),
+                                      asrecarray=True,
+                                      usemask=True)
+        if values.shape[0] != self.get_nevents():
+            difference = self.get_nevents() - values.shape[0]
             print('\'%s\' from \'%s\' is missing %d Events' %
                   (table, self.name, difference))
         return values
+
 
     def __get_ids__(self, id_dict):
         for i, file_name in enumerate(self.file_list):

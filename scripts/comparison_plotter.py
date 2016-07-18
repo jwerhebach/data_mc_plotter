@@ -14,6 +14,8 @@ from .aggarwal_err import calc_limits
 import plot_funcs
 import scripts.config_parser_helper as ch
 
+percentiles = [0.1, 0.25, 0.5, 0.75, 0.9]
+
 
 class ComparisonPlotter:
     def __init__(self,
@@ -86,16 +88,18 @@ class ComparisonPlotter:
                                   2))
                 limits[:, :, 0] = np.inf
                 limits[:, :, 1] = -np.inf
-                medians = np.ones((len(self.data_components),
-                                  len(cols)))
+                quantiles = np.ones((len(self.data_components),
+                                  len(cols),
+                                  len(percentiles)))
                 for i, comp in enumerate(self.data_components):
                     all_values[comp.name] = {}
                     comp_values = comp.get_values(table_key, cols)
+                    comp_values = dh.filter_nans(comp_values)
+                    all_values[comp.name] = comp_values
                     for j, [col, trafo] in enumerate(zip(cols, trafos)):
+                        current_col = comp_values[col]
                         if cols_mask[finished_cols + j]:
-                            filter_mask = dh.filter_nans(comp_values[:, j],
-                                                         return_mask=True)
-                            if np.sum(filter_mask) > 0:
+                            if np.sum(current_col.mask) == len(current_col):
                                 all_values[comp.name][col] = {}
                                 col_dict = all_values[comp.name][col]
                                 vals = comp_values[:, j][filter_mask]
@@ -103,8 +107,12 @@ class ComparisonPlotter:
                                 col_dict['filter_mask'] = filter_mask
                                 limits[i, j, 0] = np.min(vals)
                                 limits[i, j, 1] = np.max(vals)
+                                if limits[i, j, 0] == limits[i, j, 1]:
+                                    cols_mask[finished_cols + j] = False
                                 if self.autotransform:
-                                    medians[i, j] = np.median(vals)
+                                    quantiles[i, j, :] = np.percentile(
+                                        vals,
+                                        percentiles)
                                 elif trafo == 'log' and limits[i, j, 0] <= 0.:
                                     limits[i, j, 0] = np.min(vals[vals > 0.])
                             else:
@@ -120,9 +128,13 @@ class ComparisonPlotter:
                         diff = max_val - min_val
                         if self.autotransform:
                             if trafo in ['None', None]:
-                                median_all = np.average(medians,
-                                                        weights=n_events)
-                            ratio_media = (median_all - min_val) / diff
+                                quantiles_all = np.average(
+                                    quantiles[:, current_col, :]
+                                    weights=n_events,
+                                    axis=0)
+                            if any(quantiles_all)
+                            median = quantiles_all[2]
+                            ratio_media = (median - min_val) / diff
                             if ((ratio_media < 0.1) and min_val > 0.0):
                                 trafo = 'log10'
                             elif np.absolute(diff - np.pi) < 1e-3:
@@ -166,10 +178,6 @@ class ComparisonPlotter:
                                    self.cmds,
                                    list_data,
                                    list_plot)
-        plotting_keys = [c for i, c in enumerate(obs_keys)
-                         if cols_mask[i]]
-        transformed_keys = [c for i, c in enumerate(transformed_obs_keys)
-                            if cols_mask[i]]
         binnings = binnings[np.where(cols_mask)[0]]
         for i, comp in enumerate(self.plotting_components):
             comp.hists = plotting_hists[i, :, :]
@@ -182,9 +190,8 @@ class ComparisonPlotter:
                         title,
                         self.plotting_components,
                         binnings,
-                        plotting_keys,
                         obs_keys,
-                        transformed_keys,
+                        transformed_obs_keys,
                         self.alphas,
                         self.plot_ratios)
 

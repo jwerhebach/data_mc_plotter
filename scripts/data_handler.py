@@ -3,37 +3,46 @@
 from __future__ import division, print_function
 
 import numpy as np
+import warnings
+import cPickle
+
+def fields_view(arr, fields):
+     dtype2 = np.dtype({name: arr.dtype.fields[name] for name in fields})
+     return np.ndarray(arr.shape, dtype2, arr, 0, arr.strides)
+
+
+
+
+
+
 
 
 def get_values_from_table(table, cols, dtype=float):
-    values = np.empty((table.nrows, len(cols)), dtype=float)
+    values = np.empty(table.nrows,
+                      dtype=[(k, type_)
+                             for k, type_ in table.coldtypes.iteritems()])
     for i, row in enumerate(table.iterrows()):
-        values[i, :] = [row[col] for col in cols]
+        for key in cols:
+            values[key][i] = row[key]
     return values
 
 
-def filter_nans(values, weights=None, return_mask=False):
-    nan_mask = ~np.isnan(values)
-    finite_mask = np.isfinite(values)
-    filter_mask = np.logical_and(nan_mask, finite_mask)
-    if return_mask:
-        return filter_mask
-    if weights is None:
-        return values[filter_mask], None
-    else:
-        weights = weights[filter_mask]
-        values = values[filter_mask]
-        return values, weights.reshape(values.shape)
+def filter_nans(values):
+    for key in values.dtype.fields:
+        values[key].mask = ~np.isfinite(values[key])
+        exceptionally_big = np.where(
+            np.abs(values[key][~values[key].mask]) > 1e50)[0]
+        values[key].mask[exceptionally_big] = True
+    return values
 
 
-def filter_non_pos(values, weights=None):
-    filter_mask = values > 0
-    if weights is None:
-        return values[filter_mask]
-    else:
-        weights = weights[filter_mask]
-        values = values[filter_mask]
-        return values, weights.reshape(values.shape)
+def filter_non_pos(values):
+    for key in values.dtype.fields:
+        values[key].mask = ~np.isfinite(values[key])
+        below_zero = np.where(
+            np.abs(values[key][~values[key].mask]) > <= 0)[0]
+        values[key].mask[below_zero] = True
+    return values
 
 
 def transform_values(transformation, values, weights=None):

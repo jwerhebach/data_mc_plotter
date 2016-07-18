@@ -60,17 +60,15 @@ def plot(output,
          components,
          binnings,
          plotting_keys,
-         obs_keys,
          transformed_keys,
          alphas,
          plot_ratios=False):
-    print(plot_ratios)
     legend_objects = []
     legend_labels = []
-    n_obs = len(obs_keys)
+    n_obs = len(plotting_keys)
     print('Plot Observables')
     with tqdm(total=n_obs, unit='Observables') as pbar:
-        for i, o in enumerate(obs_keys):
+        for i, o in enumerate(plotting_keys):
             if plot_ratios:
                 fig = plt.figure(0)
                 ratio_components = [c for c in components
@@ -163,11 +161,11 @@ def plot(output,
             ax.legend(legend_objects, legend_labels,
                       handler_map=le.handler_mapper,
                       loc='best',
-                      prop={'size': 11})
+                      prop={'size': 6})
             x_label_ax.set_xlabel(transformed_keys[i])
             ax.set_ylabel('# Entries [Hz]')
             fig.suptitle(title, fontsize=14)
-            save_fig(fig, os.path.join(output, obs_keys[i]), tight=False)
+            save_fig(fig, os.path.join(output, plotting_keys[i]), tight=False)
             pbar.update(1)
 
 
