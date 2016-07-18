@@ -36,8 +36,8 @@ def get_color():
 
 get_color.pointer = -1
 
-uncertainties_cycle = ['viridis_r',
-                       'plasma_r',
+uncertainties_cycle = ['plasma_r',
+                       'viridis_r',
                        'magma_r',
                        'inferno_r']
 
@@ -66,107 +66,104 @@ def plot(output,
     legend_objects = []
     legend_labels = []
     n_obs = len(plotting_keys)
-    print('Plot Observables')
-    with tqdm(total=n_obs, unit='Observables') as pbar:
-        for i, o in enumerate(plotting_keys):
-            if plot_ratios:
-                fig = plt.figure(0)
-                ratio_components = [c for c in components
-                                    if c.uncertainties is not None]
-                height = 1 / 2 / (1 + len(ratio_components))
-                height_ratios = [0.5 + height]
-                ax_ratio = {}
-                for c in ratio_components:
-                    height_ratios.append(height)
-                gs = GridSpec(1 + len(ratio_components), 1,
-                              height_ratios=height_ratios)
-                gs.update(hspace=0.07)
-                ax = plt.subplot(gs[0])
-                for k, c in enumerate(ratio_components):
-                    ax_ratio[c.name] = {}
-                    ax_ratio[c.name] = plt.subplot(gs[1 + k], sharex=ax)
-                plt.setp(ax.get_xticklabels(), visible=False)
-            else:
-                fig, ax = plt.subplots()
-            binning = binnings[i]
-            ax.set_xlim(binning[0], binning[-1])
-            ax.set_yscale("log", nonposy='clip')
-            for j, c in enumerate(components):
-                hist = c.hists[i, :]
-                if not all(hist == 0.):
-                    if c.ctype == 'Data':
-                        obj, lab = plot_data_style(fig,
-                                                   ax,
-                                                   hist,
-                                                   binning,
-                                                   c.label,
-                                                   c.color)
+    for i, o in enumerate(plotting_keys):
+        if plot_ratios:
+            fig = plt.figure(0)
+            ratio_components = [c for c in components
+                                if c.uncertainties is not None]
+            height = 1 / 2 / (1 + len(ratio_components))
+            height_ratios = [0.5 + height]
+            ax_ratio = {}
+            for c in ratio_components:
+                height_ratios.append(height)
+            gs = GridSpec(1 + len(ratio_components), 1,
+                          height_ratios=height_ratios)
+            gs.update(hspace=0.07)
+            ax = plt.subplot(gs[0])
+            for k, c in enumerate(ratio_components):
+                ax_ratio[c.name] = {}
+                ax_ratio[c.name] = plt.subplot(gs[1 + k], sharex=ax)
+            plt.setp(ax.get_xticklabels(), visible=False)
+        else:
+            fig, ax = plt.subplots()
+        binning = binnings[i]
+        ax.set_xlim(binning[0], binning[-1])
+        ax.set_yscale("log", nonposy='clip')
+        for j, c in enumerate(components):
+            hist = c.hists[i, :]
+            if not all(hist == 0.):
+                if c.ctype == 'Data':
+                    obj, lab = plot_data_style(fig,
+                                               ax,
+                                               hist,
+                                               binning,
+                                               c.label,
+                                               c.color)
+                    if i == 0:
+                        legend_objects.append(obj)
+                        legend_labels.append(lab)
+                if c.ctype == 'MC':
+                    if c.uncertainties is None:
+                        obj, lab = plot_mc_style(fig,
+                                                 ax,
+                                                 hist,
+                                                 binning,
+                                                 c.label,
+                                                 c.color)
                         if i == 0:
                             legend_objects.append(obj)
                             legend_labels.append(lab)
-                    if c.ctype == 'MC':
-                        if c.uncertainties is None:
-                            obj, lab = plot_mc_style(fig,
-                                                     ax,
-                                                     hist,
-                                                     binning,
-                                                     c.label,
-                                                     c.color)
-                            if i == 0:
-                                legend_objects.append(obj)
-                                legend_labels.append(lab)
-                        else:
-                            uncert = c.uncertainties[i, :]
-                            obj, lab = plot_uncertainties(fig,
-                                                          ax,
-                                                          hist,
-                                                          uncert,
-                                                          binning,
-                                                          c.label,
-                                                          c.color,
-                                                          c.cmap,
-                                                          alphas)
-                            if i == 0:
-                                legend_objects.extend(obj)
-                                legend_labels.extend(lab)
-            if plot_ratios:
-                for key in ax_ratio.keys():
-                    ref_c = components[components.index(key)]
-                    ref_hist = ref_c.hists[i, :]
-                    ax_r = ax_ratio[key]
-                    ref_uncerts = ref_c.uncertainties[i, :]
-                    _, _ = plot_uncertainties(fig,
-                                              ax_r,
-                                              np.ones_like(ref_hist),
-                                              ref_uncerts,
-                                              binning,
-                                              ref_c.label,
-                                              ref_c.color,
-                                              ref_c.cmap,
-                                              alphas)
-                    ax_r.set_ylabel('Data/MC')
-                    tick_locator = MaxNLocator(nbins=4)
-                    ax_r.get_yaxis().set_major_locator(tick_locator)
-                    plt.setp(ax_r.get_xticklabels(), visible=False)
-                    for c in components:
-                        hist = c.hists[i, :]
-                        if c.name not in ax_ratio.keys() and c.ctype == 'Data':
-                            plot_data_ratio(fig, ax_r, hist, ref_hist,
-                                            binning, c.label, c.color)
-                x_label_ax = ax_r
-                ax.locator_params(axis='y', tight=True)
-                plt.setp(ax_r.get_xticklabels(), visible=True)
-            else:
-                x_label_ax = ax
-            ax.legend(legend_objects, legend_labels,
-                      handler_map=le.handler_mapper,
-                      loc='best',
-                      prop={'size': 6})
-            x_label_ax.set_xlabel(transformed_keys[i])
-            ax.set_ylabel('# Entries [Hz]')
-            fig.suptitle(title, fontsize=14)
-            save_fig(fig, os.path.join(output, plotting_keys[i]), tight=False)
-            pbar.update(1)
+                    else:
+                        uncert = c.uncertainties[i, :]
+                        obj, lab = plot_uncertainties(fig,
+                                                      ax,
+                                                      hist,
+                                                      uncert,
+                                                      binning,
+                                                      c.label,
+                                                      c.color,
+                                                      c.cmap,
+                                                      alphas)
+                        if i == 0:
+                            legend_objects.extend(obj)
+                            legend_labels.extend(lab)
+        if plot_ratios:
+            for key in ax_ratio.keys():
+                ref_c = components[components.index(key)]
+                ref_hist = ref_c.hists[i, :]
+                ax_r = ax_ratio[key]
+                ref_uncerts = ref_c.uncertainties[i, :]
+                _, _ = plot_uncertainties(fig,
+                                          ax_r,
+                                          np.ones_like(ref_hist),
+                                          ref_uncerts,
+                                          binning,
+                                          ref_c.label,
+                                          ref_c.color,
+                                          ref_c.cmap,
+                                          alphas)
+                ax_r.set_ylabel('Data/MC')
+                tick_locator = MaxNLocator(nbins=4)
+                ax_r.get_yaxis().set_major_locator(tick_locator)
+                plt.setp(ax_r.get_xticklabels(), visible=False)
+                for c in components:
+                    hist = c.hists[i, :]
+                    if c.name not in ax_ratio.keys() and c.ctype == 'Data':
+                        plot_data_ratio(fig, ax_r, hist, ref_hist,
+                                        binning, c.label, c.color)
+            x_label_ax = ax_r
+            ax.locator_params(axis='y', tight=True)
+            plt.setp(ax_r.get_xticklabels(), visible=True)
+        else:
+            x_label_ax = ax
+        ax.legend(legend_objects, legend_labels,
+                  handler_map=le.handler_mapper,
+                  loc='best',
+                  prop={'size': 6})
+        x_label_ax.set_xlabel(transformed_keys[i])
+        ax.set_ylabel('# Entries [Hz]')
+        fig.suptitle(title, fontsize=14)
+        save_fig(fig, os.path.join(output, plotting_keys[i]), tight=False)
 
 
 def plot_data_ratio(fig, ax, hist, ref_hist, binning, label, color):

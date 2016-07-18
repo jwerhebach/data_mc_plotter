@@ -6,11 +6,11 @@ import glob
 import warnings
 import numpy as np
 from numpy.lib.recfunctions import stack_arrays
+import pandas as pd
 import tables
 
 from .plot_funcs import get_color, get_cmap
 from .aggregation_math import get_participants
-import data_handler as dh
 from .config_parser_helper import split_obs_str, convert_list
 
 
@@ -22,7 +22,7 @@ class Component:
         self.ctype = option_dict['type']
         self.label = option_dict['label']
         self.color = option_dict.get('color', None)
-
+        self.id_cols = ['Component']
         directory = option_dict.get('directory', None)
         file_list = option_dict.get('filelist', None)
         max_files = int(option_dict.get('maxfiles', -1))
@@ -62,8 +62,6 @@ class Component:
         if self.color is None:
             self.color = get_color()
 
-        self.ids = self.ID()
-
         self.show = True
 
         self.hists = None
@@ -72,87 +70,50 @@ class Component:
         if self.calc_uncertainties:
             self.cmap = get_cmap()
 
-    def init_component(self, id_dict):
+    def init_component(self, id_table, id_cols):
+        self.id_table = id_table
+        self.id_cols.extend(id_cols)
         if self.aggregation is None:
-            ids, id_func, id_func_r = self.__get_ids__(id_dict)
-            self.ids.ids = ids
-            self.ids.id_func = id_func
-            self.ids.id_func_rev = id_func_r
-            if len(ids) != len(np.unique(ids)):
-                print('IDs not unique for \'%s\'!' % self.name)
             if self.weight is not None:
                 weight_dict = split_obs_str(self.weight)
-                self.weight = np.ones(self.get_nevents(),
-                                      dtype=float)
                 weight_table = weight_dict.keys()[0]
                 cols = weight_dict[weight_table][0]
-                self.weight = self.get_values(weight_table, cols)
+                self.weight = self.get_values(weight_table,
+                                              cols,
+                                              add_weight=False)
+                self.weight.rename(columns={cols[0]: 'weight'}, inplace=True)
             else:
-                self.weight = np.ones(self.get_nevents(), dtype=float)
+                self.weight = self.get_values(id_table,
+                                              id_cols,
+                                              add_weight=False)
+                self.weight['weight'] = 1.
             if self.ctype == 'MC':
                 self.weight /= self.livetime
             self.weight *= self.scaling_factor
             self.scaling_factor = 1.
-            self.nevents_weighted = np.sum(self.weight)
 
-    def get_values(self, table_key, cols):
-        n_events = self.get_nevents()
-        from_i = 0
-        values = np.empty((n_events, len(cols)))
+    def get_values(self, table_key, cols, add_weight=True):
+        if isinstance(cols, str):
+            cols = [cols]
         for i, file_name in enumerate(self.file_list):
-            f = tables.open_file(file_name)
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore')
-                table = f.get_node('/%s' % table_key)
-            values_f = dh.get_values_from_table(table,
-                                                cols)
+            f = pd.HDFStore(file_name, 'r')
+            table = f[table_key]
+            drops = [c for c in table.columns
+                     if c not in cols and c not in self.id_cols]
+            table.drop(drops, axis=1, inplace=True)
+            table['Component'] = self.name
+            table.set_index(self.id_cols, inplace=True)
             f.close()
             if i == 0:
-                values = values_f
+                values = table
             else:
-                values = stack_arrays((values, values_f),
-                                      asrecarray=True,
-                                      usemask=True)
-        if values.shape[0] != self.get_nevents():
-            difference = self.get_nevents() - values.shape[0]
-            print('\'%s\' from \'%s\' is missing %d Events' %
-                  (table, self.name, difference))
+                values = values.append(table)
+        if add_weight:
+            if isinstance(self.weight, float):
+                values['weight'] = self.weight
+            else:
+                values = values.join(self.weight)
         return values
-
-
-    def __get_ids__(self, id_dict):
-        for i, file_name in enumerate(self.file_list):
-            f = tables.open_file(file_name)
-            table_key = id_dict.keys()[0]
-            table = f.get_node('/%s' % table_key)
-            [cols, _] = id_dict[table_key]
-            id_array = dh.get_values_from_table(table,
-                                                cols,
-                                                dtype=int)
-            f.close()
-            if i == 0:
-                full_id_array = id_array
-            else:
-                full_id_array = np.vstack((full_id_array, id_array))
-        mag = np.asarray(np.log10(np.max(full_id_array, axis=0) + 1) + 1,
-                         dtype=int)
-        mag = np.cumsum(mag[::-1])[::-1]
-        mag[:-1] = mag[1:]
-        mag[-1] = 0
-        mag = np.power(10, mag)
-
-        def id_func(arr):
-            return np.sum(arr * mag, axis=1, dtype=int)
-
-        def id_func_rev(ids):
-            divided = np.asarray([ids for i in range(len(mag))]).T
-            divided = divided // mag * mag
-            divided[:, 1:] = np.diff(divided, axis=1)
-            divided = divided / mag
-            return divided
-
-        ids = id_func(full_id_array)
-        return ids, id_func, id_func_rev
 
     def get_observables(self, blacklist, check_all=False):
         [bl_tabs, bl_cols, bl_obs] = blacklist
@@ -166,7 +127,6 @@ class Component:
             f = tables.open_file(file_name)
             with warnings.catch_warnings():
                 warnings.simplefilter('ignore')
-
                 for table in f.iter_nodes('/', classname='Table'):
                     table_name = table.name
                     if table_name not in bl_tabs:
@@ -210,20 +170,16 @@ class Component:
                 for c in self.aggregation.participant:
                     n_events += c.get_nevents(weighted=True)
                 return n_events
-            elif self.weight is not None:
-                return self.nevents_weighted
             else:
-                return float(len(self.ids.ids))
+                return self.weight.weight.sum()
         else:
             if self.aggregation is not None:
                 n_events = 0
                 for c in self.aggregation.participant:
                     n_events += c.get_nevents()
                 return n_events
-            elif self.ids.ids is None:
-                return None
             else:
-                return len(self.ids.ids)
+                return len(self.weight)
 
     def set_scaling(self, scaling_factor):
         if self.aggregation is None:
@@ -248,8 +204,3 @@ class Component:
             self.cmd = cmd
             self.participant = get_participants(cmd)
             self.keep_components = keep_components
-
-    class ID:
-        ids = None
-        id_func = None
-        id_func_rev = None
