@@ -84,6 +84,8 @@ def plot(output,
                 ax_ratio[c.name] = {}
                 ax_ratio[c.name] = plt.subplot(gs[1 + k], sharex=ax)
             plt.setp(ax.get_xticklabels(), visible=False)
+            gs1.tight_layout(fig, rect=[0, 0, 0.5, 1])
+            gs2.tight_layout(fig, rect=[0, 0, 0.5, 1])
         else:
             fig, ax = plt.subplots()
         binning = binnings[i]
@@ -167,6 +169,26 @@ def plot(output,
 
 
 def plot_data_ratio(fig, ax, hist, ref_hist, binning, label, color):
+
+
+plt.figure(figsize = (4,4))
+gs1 = gridspec.GridSpec(2, 1)
+gs1.update(wspace=0.0, hspace=0.0) # set the spacing between axes.
+
+
+ax1 = plt.subplot(gs1[0])
+ax1.set_yscale("log", nonposy='clip')
+ax1.set_xticklabels([])
+
+ax2 = plt.subplot(gs1[1])
+#ax2.invert_yaxis()
+ax2.set_yscale("log", nonposy='clip')
+ax1.set_ylim(ymin=1., ymax=0.001)
+ax2.set_ylim(ymin=0.001, ymax=1.)
+
+
+
+
     not_zero_mask = hist > 0
     not_zero_mask_ref = ref_hist > 0
     finite_ratio_mask = np.logical_and(not_zero_mask, not_zero_mask_ref)

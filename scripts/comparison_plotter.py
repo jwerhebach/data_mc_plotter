@@ -80,7 +80,8 @@ class ComparisonPlotter:
             for table_key, [cols, trafos] in observables.iteritems():
                 for i, comp in enumerate(self.data_components):
                     comp_values = comp.get_values(table_key, cols)
-                    comp_values.replace([np.inf, -np.inf], np.nan)
+                    comp_values.replace([np.inf, -np.inf], np.nan,
+                                         inplace=True)
                     comp_values[comp_values.abs() > 1e20] = np.nan
                     if i == 0:
                         all_values = comp_values
@@ -223,7 +224,9 @@ def transform_values(transformation, values, key):
     if (transformation is None) or (transformation == 'None'):
         return values, key
     elif (transformation == 'log') or (transformation == 'log10'):
-        return np.log10(values), 'log10(%s)' % key
+        values = np.log10(values)
+        values.replace([np.inf, -np.inf], np.nan, inplace=True)
+        return values, 'log10(%s)' % key
     elif (transformation == 'cos'):
         return np.cos(values), 'cos(%s)' % key
     elif (transformation == 'cosdeg'):
