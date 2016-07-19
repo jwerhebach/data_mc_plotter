@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 from __future__ import division, print_function
 
+import scipy.stats.distributions as sc_dist
+
 import os
 
 import numpy as np
@@ -53,6 +55,8 @@ get_cmap.pointer = -1
 LW = 2.
 MS = '5'
 ZORDER = 2
+BORDER_OFFSET = 0.1
+RATIO_LIMIT = 1e-5
 
 
 def plot(output,
@@ -71,21 +75,27 @@ def plot(output,
             fig = plt.figure(0)
             ratio_components = [c for c in components
                                 if c.uncertainties is not None]
-            height = 1 / 2 / (1 + len(ratio_components))
-            height_ratios = [0.5 + height]
-            ax_ratio = {}
-            for c in ratio_components:
-                height_ratios.append(height)
-            gs = GridSpec(1 + len(ratio_components), 1,
-                          height_ratios=height_ratios)
-            gs.update(hspace=0.07)
-            ax = plt.subplot(gs[0])
-            for k, c in enumerate(ratio_components):
-                ax_ratio[c.name] = {}
-                ax_ratio[c.name] = plt.subplot(gs[1 + k], sharex=ax)
+            height_main = 0.5 + 0.5 * (1 / (1 + len(ratio_components)))
+
+            gs = GridSpec(1, 1)
+            ax = fig.add_subplot(gs[0])
             plt.setp(ax.get_xticklabels(), visible=False)
-            gs1.tight_layout(fig, rect=[0, 0, 0.5, 1])
-            gs2.tight_layout(fig, rect=[0, 0, 0.5, 1])
+            gs.update(left=0.+BORDER_OFFSET,
+                      right=1-BORDER_OFFSET,
+                      top=1-BORDER_OFFSET,
+                      bottom=1-height_main)
+            gs_ratio = GridSpec(len(ratio_components)*2, 1)
+            ax_ratio = {}
+            for k, c in enumerate(ratio_components):
+                ax_ratio[c.name] = [fig.add_subplot(gs_ratio[k*2]),
+                                    fig.add_subplot(gs_ratio[k*2+1])]
+
+            gs_ratio.update(left=0.+BORDER_OFFSET,
+                            right=1-BORDER_OFFSET,
+                            top=1-height_main,
+                            bottom=0.+BORDER_OFFSET,
+                            hspace=0.,
+                            wspace=0.)
         else:
             fig, ax = plt.subplots()
         binning = binnings[i]
@@ -133,29 +143,36 @@ def plot(output,
             for key in ax_ratio.keys():
                 ref_c = components[components.index(key)]
                 ref_hist = ref_c.hists[i, :]
-                ax_r = ax_ratio[key]
-                ref_uncerts = ref_c.uncertainties[i, :]
-                _, _ = plot_uncertainties(fig,
-                                          ax_r,
-                                          np.ones_like(ref_hist),
-                                          ref_uncerts,
-                                          binning,
-                                          ref_c.label,
-                                          ref_c.color,
-                                          ref_c.cmap,
-                                          alphas)
-                ax_r.set_ylabel('Data/MC')
-                tick_locator = MaxNLocator(nbins=4)
-                ax_r.get_yaxis().set_major_locator(tick_locator)
-                plt.setp(ax_r.get_xticklabels(), visible=False)
+                ax_ratio_c = ax_ratio[key]
+                ax_plus = ax_ratio_c[0]
+                ax_minus = ax_ratio_c[1]
+                ax_plus.set_ylim(ymin=1., ymax=RATIO_LIMIT)
+                ax_plus.set_yscale("log")
+                ax_minus.set_ylim(ymin=RATIO_LIMIT, ymax=1.)
+                ax_minus.set_yscale("log")
+                ax_minus.set_xlim(binning[0], binning[-1])
+                ax_plus.set_xlim(binning[0], binning[-1])
+                ref_uncerts = ref_c.uncert_ratio
+                plot_uncertainties_ratio(fig,
+                                         ax_ratio_c,
+                                         ref_c.uncert_ratio[i],
+                                         binning,
+                                         ref_c.label,
+                                         ref_c.color,
+                                         ref_c.cmap,
+                                         alphas)
                 for c in components:
                     hist = c.hists[i, :]
                     if c.name not in ax_ratio.keys() and c.ctype == 'Data':
-                        plot_data_ratio(fig, ax_r, hist, ref_hist,
-                                        binning, c.label, c.color)
-            x_label_ax = ax_r
+                        plot_data_ratio(fig,
+                                        ax_ratio_c,
+                                        c.uncert_ratio[ref_c.name][i],
+                                        binning,
+                                        c.label,
+                                        c.color)
+            x_label_ax = ax_minus
             ax.locator_params(axis='y', tight=True)
-            plt.setp(ax_r.get_xticklabels(), visible=True)
+            #plt.setp(ax_r.get_xticklabels(), visible=True)
         else:
             x_label_ax = ax
         ax.legend(legend_objects, legend_labels,
@@ -168,56 +185,90 @@ def plot(output,
         save_fig(fig, os.path.join(output, plotting_keys[i]), tight=False)
 
 
-def plot_data_ratio(fig, ax, hist, ref_hist, binning, label, color):
+def plot_uncertainties_ratio(fig,
+                             ax_ratio,
+                             uncerts_ratio,
+                             binning,
+                             label,
+                             color,
+                             cmap,
+                             alphas):
+    [ax_plus, ax_minus] = ax_ratio
+    n_alphas = len(alphas)
+    cmap = plt.get_cmap(cmap)
+    colors = cmap(np.linspace(0.1, 0.9, len(alphas)))
+    legend_entries = []
+    legend_labels = []
+    legend_entries.append(le.UncertObject(colors, color))
+    legend_labels.append(label)
+    for i, (c, a) in enumerate(zip(colors[::-1], alphas[::-1])):
+        j = n_alphas - i - 1
+        lower_limit = np.append(uncerts_ratio[0, j, 0], uncerts_ratio[:, j, 0])
+        upper_limit = np.append(uncerts_ratio[0, j, 1], uncerts_ratio[:, j, 1])
+        ax_plus.fill_between(
+                             binning,
+                             np.ones_like(upper_limit),
+                             upper_limit,
+                             step='pre',
+                             color=c,
+                             zorder=ZORDER)
+        ax_minus.fill_between(
+                             binning,
+                             np.ones_like(lower_limit),
+                             lower_limit,
+                             step='pre',
+                             color=c,
+                             zorder=ZORDER)
 
 
-plt.figure(figsize = (4,4))
-gs1 = gridspec.GridSpec(2, 1)
-gs1.update(wspace=0.0, hspace=0.0) # set the spacing between axes.
 
-
-ax1 = plt.subplot(gs1[0])
-ax1.set_yscale("log", nonposy='clip')
-ax1.set_xticklabels([])
-
-ax2 = plt.subplot(gs1[1])
-#ax2.invert_yaxis()
-ax2.set_yscale("log", nonposy='clip')
-ax1.set_ylim(ymin=1., ymax=0.001)
-ax2.set_ylim(ymin=0.001, ymax=1.)
-
-
-
-
-    not_zero_mask = hist > 0
-    not_zero_mask_ref = ref_hist > 0
-    finite_ratio_mask = np.logical_and(not_zero_mask, not_zero_mask_ref)
-    zero_ratio_mask = np.logical_and(~not_zero_mask, not_zero_mask_ref)
-    infinite_ratio_mask = np.logical_and(not_zero_mask, ~not_zero_mask_ref)
+def plot_data_ratio(fig, ax_ratio, uncerts_ratio, binning, label, color):
+    [ax_plus, ax_minus] = ax_ratio
     bin_center = (binning[1:] + binning[:-1]) / 2.
+    null_mask = np.isnan(uncerts_ratio)
+    bin_center = bin_center[~null_mask]
+    uncerts_ratio = uncerts_ratio[~null_mask]
+    plus_mask = uncerts_ratio > 0
+    minus_mask = uncerts_ratio < 0
+    plot_data_ratio_part(fig, ax_plus,
+                         bin_center[plus_mask],
+                         uncerts_ratio[plus_mask],
+                         color,
+                         bot=False)
+    plot_data_ratio_part(fig, ax_minus,
+                         bin_center[minus_mask],
+                         np.absolute(uncerts_ratio[minus_mask]),
+                         color,
+                         bot=True)
 
+def plot_data_ratio_part(fig, ax, x, y, color, bot=True):
     markeredgecolor = 'k'
     markerfacecolor = color
-    ax.plot(bin_center[finite_ratio_mask],
-            hist[finite_ratio_mask] / ref_hist[finite_ratio_mask],
+    infinite_mask = np.logical_or(np.isinf(y), y < RATIO_LIMIT)
+    ax.plot(x[~infinite_mask],
+            y[~infinite_mask],
             ls='', ms=MS,
             mew=1.,
             marker='o',
             markeredgecolor=markeredgecolor,
             markerfacecolor=markerfacecolor,
-            zorder=ZORDER+1)
-    plot_inf_marker(fig, ax,
-                    binning,
-                    ~zero_ratio_mask,
-                    markerfacecolor=markerfacecolor,
-                    markeredgecolor=markeredgecolor,
-                    bot=True)
-    plot_inf_marker(fig, ax,
-                    binning,
-                    ~infinite_ratio_mask,
-                    markerfacecolor=markerfacecolor,
-                    markeredgecolor=markeredgecolor,
-                    bot=False)
+            zorder=ZORDER+100,
+            clip_on=False)
+    #plot_inf_marker(fig, ax,
+    #                x,
+    #                ~infinite_mask,
+    #                markerfacecolor=markerfacecolor,
+    #                markeredgecolor=markeredgecolor,
+    #                bot=bot)
+
+
+
+
+
+
+
+
+
 
 
 def plot_data_style(fig, ax, hist, binning, label, color):
@@ -302,6 +353,7 @@ def plot_uncertainties(fig, ax, hist, uncert, binning,
                          label,
                          color,
                          linewidth=LW - 1.)
+    ax.set_xlim(binning[0], binning[-1])
     n_alphas = len(alphas)
     cmap = plt.get_cmap(cmap)
     colors = cmap(np.linspace(0.1, 0.9, len(alphas)))

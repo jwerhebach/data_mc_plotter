@@ -10,7 +10,7 @@ import numpy as np
 
 import data_handler as dh
 from .aggregation_math import aggregate
-from .aggarwal_err import calc_limits
+from .aggarwal_err import calc_limits, calc_p_alphas_nobs, calc_p_alpha_bands_nobs
 import plot_funcs
 import scripts.config_parser_helper as ch
 
@@ -134,7 +134,7 @@ class ComparisonPlotter:
                         all_values.drop(drops, axis=1, inplace=True)
 
                 hists = np.empty((len(self.data_components),
-                                  len(all_values.columns),
+                                  len(all_values.columns)-1,
                                   self.n_bins))
                 binnings = []
                 plotting_order_cols = []
@@ -162,12 +162,26 @@ class ComparisonPlotter:
                                            self.cmds,
                                            list_data,
                                            list_plot)
+                uncert_comp = []
                 for i, comp in enumerate(self.plotting_components):
                     comp.hists = plotting_hists[i, :, :]
                     if comp.calc_uncertainties:
                         if len(self.alphas) > 0:
-                            comp.uncertainties = calc_limits(comp.hists,
+                            uncert_abs, uncert_rel = calc_limits(comp.hists,
                                                              self.alphas)
+                            comp.uncertainties = uncert_rel
+                            if self.plot_ratios:
+                                comp.uncert_ratio = calc_p_alpha_bands_nobs(
+                                    comp.hists, uncert_abs)
+                                uncert_comp.append(comp)
+                if self.plot_ratios:
+                    for i, comp in enumerate(self.plotting_components):
+                        if comp.ctype == 'Data':
+                            comp.uncert_ratio = {}
+                            for j, u_comp in enumerate(uncert_comp):
+                                uncert_j = calc_p_alphas_nobs(
+                                    u_comp.hists, comp.hists)
+                                comp.uncert_ratio[u_comp.name] = uncert_j
                 plotting_hists /= self.data_livetime
                 plot_funcs.plot(outpath,
                                 title,

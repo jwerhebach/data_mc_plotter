@@ -66,6 +66,7 @@ class Component:
 
         self.hists = None
         self.uncertainties = None
+        self.uncert_ratio = None
         self.calc_uncertainties = option_dict.get('showuncertainties', False)
         if self.calc_uncertainties:
             self.cmap = get_cmap()
