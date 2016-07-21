@@ -38,7 +38,8 @@ def get_color():
 
 get_color.pointer = -1
 
-uncertainties_cycle = ['plasma_r',
+uncertainties_cycle = ['viridis_r',
+                       'plasma_r',
                        'viridis_r',
                        'magma_r',
                        'inferno_r']
@@ -56,7 +57,7 @@ LW = 2.
 MS = '5'
 ZORDER = 2
 BORDER_OFFSET = 0.1
-RATIO_LIMIT = 1e-5
+RATIO_LIMIT = 1e-3
 
 
 def plot(output,
@@ -147,11 +148,10 @@ def plot(output,
                 ax_plus = ax_ratio_c[0]
                 ax_minus = ax_ratio_c[1]
                 ax_plus.set_ylim(ymin=1., ymax=RATIO_LIMIT)
-                ax_plus.set_yscale("log")
+                ax_plus.xaxis.set_ticklabels([])
                 ax_minus.set_ylim(ymin=RATIO_LIMIT, ymax=1.)
-                ax_minus.set_yscale("log")
-                ax_minus.set_xlim(binning[0], binning[-1])
-                ax_plus.set_xlim(binning[0], binning[-1])
+                format_axis(ax_plus, binning)
+                format_axis(ax_minus, binning)
                 ref_uncerts = ref_c.uncert_ratio
                 plot_uncertainties_ratio(fig,
                                          ax_ratio_c,
@@ -183,6 +183,27 @@ def plot(output,
         ax.set_ylabel('# Entries [Hz]')
         fig.suptitle(title, fontsize=14)
         save_fig(fig, os.path.join(output, plotting_keys[i]), tight=False)
+
+
+def format_axis(ax, binning):
+    ax.set_yscale("log")
+    ax.set_xlim(binning[0], binning[-1])
+    ax.yaxis.set_ticks(np.logspace(-1,RATIO_LIMIT,3))
+    major_ticks = np.logspace(-1,RATIO_LIMIT,3)
+    minor_ticks = np.logspace(-1,RATIO_LIMIT,5)
+    ax.set_yticks(major_ticks)
+    ax.set_yticks(minor_ticks, minor=True)
+    ax.yaxis.grid(which='both')
+    ax.yaxis.grid(which='minor', alpha=0.2)
+    ax.yaxis.grid(which='major', alpha=0.5)
+
+
+
+
+
+
+
+
 
 
 def plot_uncertainties_ratio(fig,
@@ -222,14 +243,25 @@ def plot_uncertainties_ratio(fig,
 
 
 
-def plot_data_ratio(fig, ax_ratio, uncerts_ratio, binning, label, color):
+def plot_data_ratio(fig,
+                    ax_ratio,
+                    uncerts_ratio,
+                    binning,
+                    label,
+                    color):
     [ax_plus, ax_minus] = ax_ratio
     bin_center = (binning[1:] + binning[:-1]) / 2.
     null_mask = np.isnan(uncerts_ratio)
+    neg_inf = np.logical_and(np.isinf(uncerts_ratio), uncerts_ratio < 0)
+    pos_inf = np.logical_and(np.isinf(uncerts_ratio), uncerts_ratio > 0)
+
     bin_center = bin_center[~null_mask]
     uncerts_ratio = uncerts_ratio[~null_mask]
     plus_mask = uncerts_ratio > 0
     minus_mask = uncerts_ratio < 0
+
+    markeredgecolor = 'k'
+    markerfacecolor = color
     plot_data_ratio_part(fig, ax_plus,
                          bin_center[plus_mask],
                          uncerts_ratio[plus_mask],
@@ -240,11 +272,24 @@ def plot_data_ratio(fig, ax_ratio, uncerts_ratio, binning, label, color):
                          np.absolute(uncerts_ratio[minus_mask]),
                          color,
                          bot=True)
+    plot_inf_marker(fig, ax_minus,
+                    binning,
+                    ~neg_inf,
+                    markerfacecolor=markerfacecolor,
+                    markeredgecolor=markeredgecolor,
+                    bot=True)
+
+    plot_inf_marker(fig, ax_plus,
+                    binning,
+                    ~pos_inf,
+                    markerfacecolor=markerfacecolor,
+                    markeredgecolor=markeredgecolor,
+                    bot=False)
 
 def plot_data_ratio_part(fig, ax, x, y, color, bot=True):
     markeredgecolor = 'k'
     markerfacecolor = color
-    infinite_mask = np.logical_or(np.isinf(y), y < RATIO_LIMIT)
+    infinite_mask = np.isinf(y)
     ax.plot(x[~infinite_mask],
             y[~infinite_mask],
             ls='', ms=MS,
@@ -254,20 +299,136 @@ def plot_data_ratio_part(fig, ax, x, y, color, bot=True):
             markerfacecolor=markerfacecolor,
             zorder=ZORDER+100,
             clip_on=False)
-    #plot_inf_marker(fig, ax,
-    #                x,
-    #                ~infinite_mask,
-    #                markerfacecolor=markerfacecolor,
-    #                markeredgecolor=markeredgecolor,
-    #                bot=bot)
 
 
+def generate_ticks(y_0, y_min, max_ticks_per_side=5):
+    y_min = np.floor(y_min)
+    y_0_log = np.log10(y_0)
+
+    tick_pos = []
+
+    n_ticks = 1
+    tick_pos.append(y_0_log)
+    if y_0_log != np.floor(y_0_log):
+        tick_pos.append(np.floor(y_0_log))
+        n_ticks += 2
+    while tick_pos[-1] > y_min:
+        tick_pos.append(tick_pos[-1]-1)
+        n_ticks += 2
+    n_ticks_per_side = (n_ticks-1)/2
+    mayor_step_size = np.ceil(n_ticks_per_side/max_ticks_per_side)
+    tick_pos_mapped, _, _ = map_ratio(np.power(10, tick_pos),
+                                                y_min=y_min,
+                                                y_0=y_0)
+    mayor_ticks = []
+    mayor_ticks_labels = []
+
+    minor_ticks = []
+    minor_ticks_labels = []
+    mayor_tick_counter = 0
+    for i, [p, l] in enumerate(zip(tick_pos_mapped, tick_pos)):
+        lab = 10**l
+        lab = u'10$^{\mathregular{%d}}$' % l
+        if i == 0:
+            mayor_ticks_labels.append(lab)
+            mayor_ticks.append(0)
+        else:
+            if mayor_tick_counter == mayor_step_size:
+                mayor_ticks.extend([p*-1, p])
+                mayor_ticks_labels.extend([lab, lab])
+                mayor_tick_counter = 0
+            else:
+                minor_ticks.extend([p*-1, p])
+                minor_ticks_labels.extend([lab, lab])
+                mayor_tick_counter += 1
+
+    return mayor_ticks_labels, mayor_ticks, minor_ticks_labels, minor_ticks
+
+def map_ratio(y_values, y_min=None, y_0=1.):
+    flattened_y = y_values.reshape(np.prod(y_values.shape))
+    infinite = np.isinf(flattened_y)
+    finite = np.isfinite(flattened_y)
+    finite_y = flattened_y[finite]
+    finite_y[finite_y > y_0] = np.NaN
+    plus_mask = finite_y > 0
+    minus_mask = finite_y < 0
+    finite_y = np.absolute(finite_y)
+    finite_y[plus_mask] = np.log10(finite_y[plus_mask])
+    finite_y[minus_mask] = np.log10(finite_y[minus_mask])
+    if y_min is None:
+        y_min = min(np.min(finite_y[plus_mask]),
+                       np.min(finite_y[minus_mask]))
+    finite_y /= np.absolute(y_min)
+    finite_y[finite_y > 1] = np.inf
+    finite_y[finite_y < -1] = -np.inf
+    finite_y[minus_mask] *= -1
+    tranformed_values = np.zeros_like(flattened_y)
+    tranformed_values[:] = np.NaN
+    tranformed_values[finite] = finite_y
+    tranformed_values[infinite] = flattened_y[infinite]
+    return tranformed_values.reshape(y_values.shape)*-1, y_0, y_min
 
 
+def plot_data_ratio_mapped(fig,
+                           ax,
+                           uncerts_ratio,
+                           binning,
+                           label,
+                           color):
+    bin_center = (binning[1:] + binning[:-1]) / 2.
+    finite_mask = np.isfinite(uncerts_ratio)
+    neg_inf = np.isneginf(uncerts_ratio)
+    pos_inf = np.isposinf(uncerts_ratio)
+
+    bin_center = bin_center[finite_mask]
+    uncerts_ratio = uncerts_ratio[finite_mask]
+
+    markeredgecolor = 'k'
+    markerfacecolor = color
+    plot_data_ratio_part(fig, ax,
+                         bin_center,
+                         uncerts_ratio,
+                         color,
+                         bot=False)
+    plot_inf_marker(fig, ax,
+                    binning,
+                    ~neg_inf,
+                    markerfacecolor=markerfacecolor,
+                    markeredgecolor=markeredgecolor,
+                    bot=True)
+    plot_inf_marker(fig, ax,
+                    binning,
+                    ~pos_inf,
+                    markerfacecolor=markerfacecolor,
+                    markeredgecolor=markeredgecolor,
+                    bot=False)
 
 
-
-
+def plot_uncertainties_ratio_mapped(fig,
+                             ax_ratio,
+                             uncerts_ratio,
+                             binning,
+                             y_0,
+                             y_min,
+                             label,
+                             color,
+                             cmap,
+                             alphas):
+    n_alphas = len(alphas)
+    cmap = plt.get_cmap(cmap)
+    colors = cmap(np.linspace(0.1, 0.9, len(alphas)))
+    for i, (c, a) in enumerate(zip(colors[::-1], alphas[::-1])):
+        j = n_alphas - i - 1
+        lower_limit = uncerts_ratio[:, j, 0]
+        upper_limit = uncerts_ratio[:, j, 1]
+        upper_limit[np.isinf(upper_limit)] = 0
+        lower_limit[np.isinf(lower_limit)] = -1
+        ax_ratio.fill_between(
+                             binning,
+                             upper_limit,
+                             lower_limit,
+                             step='pre',
+                             color=c)
 
 
 

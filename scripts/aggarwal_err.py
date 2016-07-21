@@ -6,27 +6,7 @@ import numpy as np
 import scipy.stats.distributions as sc_dist
 
 
-def __shorten_single_limits_single_mu__(lower, upper, mu, alpha):
-    cdf_lower, cdf_upper = sc_dist.poisson.cdf([lower, upper], mu)
-    while True:
-        pmf_lower, pmf_upper = sc_dist.poisson.pmf([lower, upper], mu)
-        if pmf_lower > pmf_upper:
-            cdf_upper -= pmf_upper
-            temp_lower = lower
-            temp_upper = upper - 1
-        else:
-            cdf_lower += cdf_lower
-            temp_lower = lower + 1
-            temp_upper = upper
-        if (cdf_upper - cdf_lower + pmf_lower) > alpha:
-            lower = temp_lower
-            upper = temp_upper
-        else:
-            break
-    return lower, upper
-
-
-def calc_limits(mu, alphas=0.68268949, rel=True):
+def calc_limits(mu, sum_w, sum_w2, alphas=0.68268949, rel=True):
     if isinstance(alphas, float):
         lim_shape = list(mu.shape) + [2]
         lim = np.zeros(lim_shape)
@@ -68,7 +48,7 @@ def calc_limits(mu, alphas=0.68268949, rel=True):
         return lim_abs, lim_rel
 
 
-def calc_p_alpha_bands(ref_hist, hist):
+def calc_p_alpha_bands(ref_hist, sum_w, sum_w2, hist):
     a_ref = sc_dist.poisson.cdf(ref_hist, ref_hist)
     hist_lower = hist[:, :, 0]
     hist_upper = hist[:, :, 1]
@@ -87,14 +67,36 @@ def calc_p_alpha_bands(ref_hist, hist):
             a_lower = (a_lower)
             a_upper /= (1-a_mu)
             a_lower /= a_mu
+            a_lower[x_lower == 0] = np.inf
+            a_upper[x_upper == 0] = np.inf
             uncert_lower[i] = a_lower.reshape(a_shape)
             uncert_upper[i] = a_upper.reshape(a_shape)
-    uncert[:, :, 0] = uncert_lower
+        else:
+            a_shape = uncert_lower[i].shape
+            x_lower = hist_lower[i].reshape(np.prod(a_shape))
+            x_upper = hist_upper[i].reshape(np.prod(a_shape))
+            a_lower = np.zeros_like(x_upper)*np.nan
+            a_upper = np.zeros_like(x_upper)*np.nan
+            a_lower[x_lower > 0] = -np.inf
+            a_upper[x_upper > 0] = np.inf
+            uncert_lower[i] = a_lower.reshape(a_shape)
+            uncert_upper[i] = a_upper.reshape(a_shape)
+#    np.isclose() uncert_lower
+    uncert[:, :, 0] = uncert_lower * -1
     uncert[:, :, 1] =uncert_upper
     return uncert
 
 
-def calc_p_alpha_single(ref_hist, hist):
+def calc_p_alpha_bands_nobs(ref_hist, sum_w, sum_w2, hist):
+    # Input expected to be [N_BINS, N_ALPHAS, 2]
+    a = np.empty_like(hist)
+    for i in range(hist.shape[0]):
+        a[i] = calc_p_alpha_bands(ref_hist[i], hist[i])
+    return a
+
+
+
+def calc_p_alpha_single(ref_hist, sum_w, sum_w2, hist):
     # Input expected to be [N_BINS]
     a_ref = sc_dist.poisson.cdf(ref_hist, ref_hist)
     uncert = np.empty_like(hist)
@@ -115,37 +117,16 @@ def calc_p_alpha_single(ref_hist, hist):
     return uncert
 
 
-def calc_p_alpha_bands_nobs(ref_hist, hist):
+def calc_p_alpha_bands_nobs(ref_hist, sum_w, sum_w2, hist):
     # Input expected to be [N_BINS, N_ALPHAS, 2]
     a = np.empty_like(hist)
     for i in range(hist.shape[0]):
-        a[i] = calc_p_alpha_bands(ref_hist[i], hist[i])
+        a[i] = calc_p_alpha_bands(ref_hist[i], None, None, hist[i])
     return a
 
-def calc_p_alphas_nobs(ref_hist, hist):
+def calc_p_alphas_nobs(ref_hist, sum_w, sum_w2, hist):
     # Input expected to be [N_BINS]
     a = np.empty_like(hist)
     for i in range(hist.shape[0]):
-        a[i] = calc_p_alpha_single(ref_hist[i], hist[i])
+        a[i] = calc_p_alpha_single(ref_hist[i], None, None, hist[i])
     return a
-
-
-def calc_limits_different_mode(mu, alpha=0.68268949, interval_type='central'):
-    mu = np.asarray(mu)
-    alpha = np.asarray(alpha)
-    lower, upper = sc_dist.poisson.interval(alpha, mu)
-    if interval_type == 'shortest':
-        for i, mu_i in enumerate(mu):
-            lower[i], upper[i] = __shorten_single_limits_single_mu__(
-                lower[i], upper[i], mu_i, alpha)
-    return lower, upper
-
-
-if __name__ == '__main__':
-    mu = np.arange(27).reshape((3, 3, 3))
-    alpha = 0.999
-    a = calc_limits(mu, alpha)
-    print(a.shape)
-    alpha = []
-    a = calc_limits(mu, alpha)
-    print(a.shape)

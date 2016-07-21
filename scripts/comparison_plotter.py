@@ -168,11 +168,12 @@ class ComparisonPlotter:
                     if comp.calc_uncertainties:
                         if len(self.alphas) > 0:
                             uncert_abs, uncert_rel = calc_limits(comp.hists,
+                                                             None, None,
                                                              self.alphas)
                             comp.uncertainties = uncert_rel
                             if self.plot_ratios:
                                 comp.uncert_ratio = calc_p_alpha_bands_nobs(
-                                    comp.hists, uncert_abs)
+                                    comp.hists, None, None, uncert_abs)
                                 uncert_comp.append(comp)
                 if self.plot_ratios:
                     for i, comp in enumerate(self.plotting_components):
@@ -180,7 +181,7 @@ class ComparisonPlotter:
                             comp.uncert_ratio = {}
                             for j, u_comp in enumerate(uncert_comp):
                                 uncert_j = calc_p_alphas_nobs(
-                                    u_comp.hists, comp.hists)
+                                    u_comp.hists, None, None, comp.hists)
                                 comp.uncert_ratio[u_comp.name] = uncert_j
                 plotting_hists /= self.data_livetime
                 plot_funcs.plot(outpath,
