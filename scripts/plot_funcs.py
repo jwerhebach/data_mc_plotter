@@ -116,6 +116,10 @@ def plot(output,
                     if i == 0:
                         legend_objects.append(obj)
                         legend_labels.append(lab)
+                    np.min(hist)
+                    max_y = 10 **(np.ceil(np.log10(np.nanmax(hist))))
+                    min_y = 10 **(np.floor(np.log10(np.nanmin(hist[hist > 0]))) - 3)
+                    ax.set_ylim([min_y, max_y])
                 if c.ctype == 'MC':
                     if c.uncertainties is None:
                         obj, lab = plot_mc_style(fig,
@@ -242,7 +246,7 @@ def plot(output,
         ax.legend(legend_objects, legend_labels,
                   handler_map=le.handler_mapper,
                   loc='best',
-                  prop={'size': 12})
+                  prop={'size': 11})
         x_label_ax.set_xlabel(transformed_keys[i])
         ax.set_ylabel('# Entries [Hz]')
         fig.suptitle(title, fontsize=14)
