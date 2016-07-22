@@ -331,8 +331,17 @@ def map_ratio(y_values, y_min=None, y_0=1.):
     finite_y[plus_mask] = np.log10(finite_y[plus_mask])
     finite_y[minus_mask] = np.log10(finite_y[minus_mask])
     if y_min is None:
-        y_min = min(np.min(finite_y[plus_mask]),
-                       np.min(finite_y[minus_mask]))
+        try:
+            y_min_plus = np.min(finite_y[plus_mask])
+        except ValueError:
+            y_min_plus = np.inf
+        try:
+            y_min_minus = np.min(finite_y[minus_mask])
+        except ValueError:
+            y_min_minus = np.inf
+        y_min = min(y_min_plus, y_min_minus)
+        if np.isinf(y_min):
+            raise ValueError
         y_min *= 1.1
     finite_y /= np.absolute(y_min)
     finite_y[finite_y > 1] = 1.1
