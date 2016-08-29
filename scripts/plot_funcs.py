@@ -393,14 +393,14 @@ def plot_data_ratio_mapped(fig,
                     ~neg_inf,
                     markerfacecolor=markerfacecolor,
                     markeredgecolor=markeredgecolor,
-                    bot=False,
+                    bot=True,
                     alpha=0.5)
     plot_inf_marker(fig, ax,
                     binning,
                     ~pos_inf,
                     markerfacecolor=markerfacecolor,
                     markeredgecolor=markeredgecolor,
-                    bot=True,
+                    bot=False,
                     alpha=0.5)
 
 
