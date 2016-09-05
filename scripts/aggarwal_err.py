@@ -109,11 +109,17 @@ def calc_p_alpha_single(ref_hist, sum_w, sum_w2, hist):
         elif x == 0:
             uncert[i] = -np.inf
         elif x > mu:
-            uncert[i] = (1-a)/(1-a_mu)
+            if (1-a) == 0:
+                uncert[i] = np.inf
+            else:
+                uncert[i] = (1-a)/(1-a_mu)
         else:
             a_0 = sc_dist.poisson.pmf(x, mu)
             uncert[i] = (a-a_0)/(-1*a_mu)
-
+            if (a-a_0) == 0:
+               uncert[i] = -np.inf
+            else:
+                uncert[i] = (a-a_0)/(-1*a_mu)
     return uncert
 
 

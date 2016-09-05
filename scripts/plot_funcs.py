@@ -381,26 +381,26 @@ def plot_data_ratio_mapped(fig,
                     ~oor_maker_neg,
                     markerfacecolor=markerfacecolor,
                     markeredgecolor=markeredgecolor,
-                    bot=False)
+                    bot=True)
     plot_inf_marker(fig, ax,
                     binning,
                     ~oor_maker_pos,
                     markerfacecolor=markerfacecolor,
                     markeredgecolor=markeredgecolor,
-                    bot=True)
+                    bot=False)
     plot_inf_marker(fig, ax,
                     binning,
                     ~neg_inf,
                     markerfacecolor=markerfacecolor,
                     markeredgecolor=markeredgecolor,
-                    bot=True,
+                    bot=False,
                     alpha=0.5)
     plot_inf_marker(fig, ax,
                     binning,
                     ~pos_inf,
                     markerfacecolor=markerfacecolor,
                     markeredgecolor=markeredgecolor,
-                    bot=False,
+                    bot=True,
                     alpha=0.5)
 
 
