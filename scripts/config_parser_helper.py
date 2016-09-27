@@ -16,7 +16,11 @@ def split_obs_str(obs):
         splitted = o.split('.')
         key = splitted[0]
         current_content = obs_dict.get(key, [[], []])
-        current_content[0].append(splitted[1])
+        try:
+            current_content[0].append(splitted[1])
+        except IndexError:
+            print(o)
+            exit()
         if len(splitted) == 3:
             current_content[1].append(splitted[2])
         else:

@@ -10,9 +10,11 @@ import numpy as np
 
 import data_handler as dh
 from .aggregation_math import aggregate
-from .aggarwal_err import calc_limits
+from .aggarwal_err import calc_limits, calc_p_alphas_nobs, calc_p_alpha_bands_nobs
 import plot_funcs
 import scripts.config_parser_helper as ch
+
+percentiles = [0.1, 0.25, 0.5, 0.75, 0.9]
 
 
 class ComparisonPlotter:
@@ -25,10 +27,11 @@ class ComparisonPlotter:
                  alphas=[0.682689492, 0.9, 0.99],
                  plot_ratios=True):
         self.components = components
-        self.id_dict = ch.split_obs_str(id_keys)
-        assert len(self.id_dict.keys()) == 1, \
+        id_dict = ch.split_obs_str(id_keys)
+        assert len(id_dict.keys()) == 1, \
             'id_keys have to be from one table!'
-        self.id_cols = self.id_dict[self.id_dict.keys()[0]][0]
+        self.id_table = id_dict.keys()[0]
+        self.id_cols = id_dict[self.id_table][0]
         self.match = match
         self.autotransform = autotransform
         self.n_bins = n_bins
@@ -38,7 +41,7 @@ class ComparisonPlotter:
         self.n_events_data = 0
 
         for i, c in enumerate(components):
-            c.init_component(self.id_dict)
+            c.init_component(self.id_table, self.id_cols)
             if c.ctype == 'Data':
                 self.data_livetime += c.livetime
                 self.n_events_data = c.get_nevents()
@@ -72,121 +75,124 @@ class ComparisonPlotter:
         list_plot = [str(c) for c in self.plotting_components]
         n_events = np.asarray(
             [c.get_nevents(weighted=True) for c in self.data_components])
-        hists = np.zeros((len(self.data_components), n_obs, self.n_bins))
-        binnings = np.zeros((n_obs, self.n_bins + 1))
-        transformed_obs_keys = []
-        obs_keys = []
-        cols_mask = np.ones(n_obs, dtype=bool)
-        finished_cols = 0
-        with tqdm(total=n_obs, unit='Observables') as pbar:
-            for table_key, [cols, trafos] in observables.iteritems():
-                all_values = {}
-                limits = np.ones((len(self.data_components),
-                                  len(cols),
-                                  2))
-                limits[:, :, 0] = np.inf
-                limits[:, :, 1] = -np.inf
-                medians = np.ones((len(self.data_components),
-                                  len(cols)))
-                for i, comp in enumerate(self.data_components):
-                    all_values[comp.name] = {}
-                    comp_values = comp.get_values(table_key, cols)
-                    for j, [col, trafo] in enumerate(zip(cols, trafos)):
-                        if cols_mask[finished_cols + j]:
-                            filter_mask = dh.filter_nans(comp_values[:, j],
-                                                         return_mask=True)
-                            if np.sum(filter_mask) > 0:
-                                all_values[comp.name][col] = {}
-                                col_dict = all_values[comp.name][col]
-                                vals = comp_values[:, j][filter_mask]
-                                col_dict['values'] = vals
-                                col_dict['filter_mask'] = filter_mask
-                                limits[i, j, 0] = np.min(vals)
-                                limits[i, j, 1] = np.max(vals)
-                                if self.autotransform:
-                                    medians[i, j] = np.median(vals)
-                                elif trafo == 'log' and limits[i, j, 0] <= 0.:
-                                    limits[i, j, 0] = np.min(vals[vals > 0.])
-                            else:
-                                cols_mask[finished_cols + j] = False
-                min_vals = np.min(limits[:, :, 0], axis=0)
-                max_vals = np.min(limits[:, :, 1], axis=0)
-                for j, [col, trafo] in enumerate(zip(cols, trafos)):
-                    current_col = finished_cols + j
-                    min_val = min_vals[j]
-                    max_val = max_vals[j]
-                    obs_key = '%s.%s' % (table_key, col)
-                    if cols_mask[current_col]:
-                        diff = max_val - min_val
-                        if self.autotransform:
-                            if trafo in ['None', None]:
-                                median_all = np.average(medians,
-                                                        weights=n_events)
-                            ratio_media = (median_all - min_val) / diff
-                            if ((ratio_media < 0.1) and min_val > 0.0):
-                                trafo = 'log10'
-                            elif np.absolute(diff - np.pi) < 1e-3:
-                                trafo = 'cos'
-                            else:
-                                trafo = None
-                        transformed_obs_key = dh.transform_obs(trafo, obs_key)
-                        obs_keys.append(obs_key)
-                        transformed_obs_keys.append(transformed_obs_key)
-                        transformed_limits = dh.transform_values(
-                            trafo,
-                            np.asarray([min_val, max_val]))
-                        min_val = transformed_limits[0]
-                        max_val = transformed_limits[1]
-                        if max_val < min_val:
-                            max_val, min_val = min_val, max_val
-                        diff = max_val - min_val
-                        offset = diff * 1e-5
-                        binnings[current_col] = np.linspace(
-                            min_val - offset,
-                            max_val + offset,
-                            self.n_bins + 1)
-                        for i, comp in enumerate(self.data_components):
-                            col_dict = all_values[comp.name][col]
-                            weights = comp.weight[col_dict['filter_mask']]
-                            vals, weights = dh.transform_values(
-                                trafo, col_dict['values'], weights)
-                            weights = weights.reshape(vals.shape)
-                            hist = np.histogram(vals,
-                                                bins=binnings[current_col],
-                                                weights=weights)[0]
-                            if comp.ctype == 'MC':
-                                hists[i, current_col, :] = hist * self.data_livetime
-                            else:
-                                hists[i, current_col, :] = hist
-                finished_cols += len(cols)
-                pbar.update(len(cols))
 
-        hists = hists[:, np.where(cols_mask)[0], :]
-        plotting_hists = aggregate(hists,
-                                   self.cmds,
-                                   list_data,
-                                   list_plot)
-        plotting_keys = [c for i, c in enumerate(obs_keys)
-                         if cols_mask[i]]
-        transformed_keys = [c for i, c in enumerate(transformed_obs_keys)
-                            if cols_mask[i]]
-        binnings = binnings[np.where(cols_mask)[0]]
-        for i, comp in enumerate(self.plotting_components):
-            comp.hists = plotting_hists[i, :, :]
-            if comp.calc_uncertainties:
-                if len(self.alphas) > 0:
-                    comp.uncertainties = calc_limits(comp.hists,
-                                                     self.alphas)
-        plotting_hists /= self.data_livetime
-        plot_funcs.plot(outpath,
-                        title,
-                        self.plotting_components,
-                        binnings,
-                        plotting_keys,
-                        obs_keys,
-                        transformed_keys,
-                        self.alphas,
-                        self.plot_ratios)
+        with tqdm(total=n_obs, unit='Observable') as pbar:
+            for table_key, [cols, trafos] in observables.iteritems():
+                for i, comp in enumerate(self.data_components):
+                    comp_values = comp.get_values(table_key, cols)
+                    comp_values.replace([np.inf, -np.inf], np.nan,
+                                         inplace=True)
+                    comp_values[comp_values.abs() > 1e20] = np.nan
+                    if i == 0:
+                        all_values = comp_values
+                    else:
+                        all_values = all_values.append(comp_values)
+                binning_dict = {}
+                if self.autotransform:
+                    drops = []
+                    for i, c in enumerate(cols):
+                        series = all_values[c]
+                        min_val = serius.min()
+                        max_val = series.max()
+                        if not np.isfinite(mins[c]):
+                            drops.append(c)
+                        elif np.isclose(mins[c], maxs[c]):
+                            drops.append(c)
+                        if issubclass(series.dtype.type, np.integer):
+                            diff = max_val - min_val
+                            if diff < self.n_bins*2:
+                                binning_dict[c] = np.linspace(min_val-0.5,
+                                                              max_val+0.5,
+                                                              diff+1)
+                            elif diff > 1e3:
+                                binning_dict[c] = np.linspace(min_val-0.5,
+                                                              max_val+0.5,
+                                                              diff+1)
+                    if len(drops) > 0:
+                        all_values.drop(drops, axis=1, inplace=True)
+                else:
+                    plot_labels = {}
+                    for c, t in zip(cols, trafos):
+                        obs_key = '%s.%s' % (table_key, c)
+                        all_values[c], c_t = transform_values(
+                            t, all_values[c], obs_key)
+                        plot_labels[c] = [obs_key, c_t]
+                    mins = all_values.min()
+                    maxs = all_values.max()
+                    drops = []
+                    for c in cols:
+                        if not np.isfinite(mins[c]):
+                            drops.append(c)
+                        elif np.isclose(mins[c], maxs[c]):
+                            drops.append(c)
+                        else:
+                            offset = (maxs[c] - mins[c]) * 1e-3
+                            binning_dict[c] = np.linspace(mins[c],
+                                                          maxs[c]+offset,
+                                                          self.n_bins+1)
+                    if len(drops) > 0:
+                        all_values.drop(drops, axis=1, inplace=True)
+
+                hists = np.empty((len(self.data_components),
+                                  len(all_values.columns)-1,
+                                  self.n_bins))
+                binnings = []
+                plotting_order_cols = []
+                plotting_order_trans_cols = []
+                weights = all_values.weight
+                for j, c in enumerate(all_values.columns):
+                    if c != 'weight':
+                        df = all_values[[c, 'weight']]
+                        df = df.dropna()
+                        [obs_key, obs_key_t] = plot_labels[c]
+                        plotting_order_cols.append(obs_key)
+                        plotting_order_trans_cols.append(obs_key_t)
+                        binning = binning_dict[c]
+                        series = all_values[c]
+                        for i, comp in enumerate(self.data_components):
+                            hist = np.histogram(df[c][comp.name],
+                                                bins=binning,
+                                                weights=df['weight'][comp.name])[0]
+                            if comp.ctype == 'MC':
+                                    hists[i, j, :] = hist * self.data_livetime
+                            else:
+                                hists[i, j, :] = hist
+                        binnings.append(binning)
+                plotting_hists = aggregate(hists,
+                                           self.cmds,
+                                           list_data,
+                                           list_plot)
+                uncert_comp = []
+                for i, comp in enumerate(self.plotting_components):
+                    comp.hists = plotting_hists[i, :, :]
+                    if comp.calc_uncertainties:
+                        if len(self.alphas) > 0:
+                            uncert_abs, uncert_rel = calc_limits(comp.hists,
+                                                             None, None,
+                                                             self.alphas)
+                            comp.uncertainties = uncert_rel
+                            if self.plot_ratios:
+                                comp.uncert_ratio = calc_p_alpha_bands_nobs(
+                                    comp.hists, None, None, uncert_abs)
+                                uncert_comp.append(comp)
+                if self.plot_ratios:
+                    for i, comp in enumerate(self.plotting_components):
+                        if comp.ctype == 'Data':
+                            comp.uncert_ratio = {}
+                            for j, u_comp in enumerate(uncert_comp):
+                                uncert_j = calc_p_alphas_nobs(
+                                    u_comp.hists, None, None, comp.hists)
+                                comp.uncert_ratio[u_comp.name] = uncert_j
+                plotting_hists /= self.data_livetime
+                plot_funcs.plot(outpath,
+                                title,
+                                self.plotting_components,
+                                binnings,
+                                plotting_order_cols,
+                                plotting_order_trans_cols,
+                                self.alphas,
+                                self.plot_ratios)
+                pbar.update(len(cols))
 
     def get_possiblites(self,
                         outpath,
@@ -210,7 +216,7 @@ class ComparisonPlotter:
             else:
                 obs_set = obs_set.intersection(component_set)
         sorted_list = sorted(obs_set)
-        with open(os.path.join(outpath, 'observable.txt'), 'wb') as f:
+        with open(os.path.join(outpath, 'observables.txt'), 'wb') as f:
             f.write('[')
             for i, observable in enumerate(sorted_list):
                 if i == 0:
@@ -227,3 +233,34 @@ class ComparisonPlotter:
             return None
         else:
             return np.linspace(min_val, max_val, self.n_bins + 1)
+
+
+def transform_values(transformation, values, key):
+    if (transformation is None) or (transformation == 'None'):
+        return values, key
+    elif (transformation == 'log') or (transformation == 'log10'):
+        values = np.log10(values)
+        values.replace([np.inf, -np.inf], np.nan, inplace=True)
+        return values, 'log10(%s)' % key
+    elif (transformation == 'cos'):
+        return np.cos(values), 'cos(%s)' % key
+    elif (transformation == 'cosdeg'):
+        return np.cos(np.deg2rad(values)), 'cos(%s)' % key
+    elif (transformation == 'sin'):
+        return np.sin(values), 'sin(%s)' % key
+    elif (transformation == 'sindeg'):
+        return np.sin(np.deg2rad(values)), 'sin(%s)' % key
+    else:
+        print('Invalid transformation \'%s\'' % transformation)
+        return values, weights
+
+
+
+
+
+
+
+
+
+
+

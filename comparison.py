@@ -77,14 +77,17 @@ if __name__ == '__main__':
         curr_component = Component(c, component_dict)
         if curr_component not in components:
             components.append(curr_component)
+        else:
+            index = components.index(c_a)
+            components[index].show = True
         if curr_component.aggregation is not None:
             for i, c_a in enumerate(curr_component.aggregation.participant):
                 if c_a not in components:
                     component_dict = dict(config.items(c_a))
                     components.append(Component(c_a, component_dict))
+                    if not curr_component.aggregation.keep_components:
+                        components[-1].show = False
                 index = components.index(c_a)
-                if not curr_component.aggregation.keep_components:
-                    components[index].show = False
                 curr_component.aggregation.participant[i] = components[index]
 
     if config.has_option('General', 'Alphas'):
@@ -149,13 +152,14 @@ if __name__ == '__main__':
         obs = comp_plotter.get_possiblites(outpath=outpath,
                                            blacklist=blacklist)
         if opts.possible:
+            print('Possible Observables saved in \'%s/observables.txt\''
+                  % outpath)
             sys.exit()
 
     if config.has_option('General', 'AutoScale'):
         scaling_comps_opts = config.get('General', 'AutoScale')
         scaling_comps = ch.convert_list(scaling_comps_opts)
         comp_plotter.auto_scale(scaling_comps)
-
 
     comp_plotter.fetch_data_and_plot(title=title,
                                      observables=obs,
