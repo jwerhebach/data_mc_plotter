@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 import numpy as np
 
-import data_handler as dh
+#import data_handler as dh
 from .aggregation_math import aggregate
 from .aggarwal_err import calc_limits, calc_p_alphas_nobs, calc_p_alpha_bands_nobs
 import plot_funcs
